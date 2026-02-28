@@ -113,15 +113,6 @@ body {
   animation: pulse-soft 1.5s ease-in-out infinite;
 }
 
-/* ── Mode Toggle Pill ── */
-.mode-toggle {
-  position: relative;
-}
-
-.mode-toggle .mode-slider {
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 /* ── Send Button Pulse ── */
 .send-btn-ready {
   animation: send-pulse 2.5s ease-in-out infinite;

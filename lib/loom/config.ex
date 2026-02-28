@@ -13,9 +13,10 @@ defmodule Loom.Config do
   @defaults %{
     model: %{
       default: "anthropic:claude-sonnet-4-6",
-      weak: "anthropic:claude-haiku-4-5",
-      architect: "anthropic:claude-opus-4-6",
-      editor: "anthropic:claude-haiku-4-5"
+      # Secondary model for editor tasks — nil means "use the primary model".
+      # Only used when an agent determines a lesser model is acceptable.
+      # Users can set this in .loom.toml: [model] editor = "anthropic:claude-haiku-4-5"
+      editor: nil
     },
     repo: %{
       watch_enabled: true

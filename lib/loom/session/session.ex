@@ -3,7 +3,6 @@ defmodule Loom.Session do
 
   use GenServer
 
-  alias Loom.AgentLoop
   alias Loom.Session.{Architect, Persistence}
 
   require Logger
@@ -16,9 +15,7 @@ defmodule Loom.Session do
     :status,
     messages: [],
     tools: [],
-    auto_approve: false,
-    pending_permission: nil,
-    mode: :normal
+    auto_approve: false
   ]
 
   # --- Public API ---
@@ -75,15 +72,6 @@ defmodule Loom.Session do
     end
   end
 
-  @doc "Respond to a pending permission request from the LiveView."
-  @spec respond_to_permission(String.t(), String.t(), map()) :: :ok | {:error, term()}
-  def respond_to_permission(session_id, action, meta \\ %{}) do
-    case Loom.Session.Manager.find_session(session_id) do
-      {:ok, pid} -> GenServer.cast(pid, {:permission_response, action, meta})
-      :error -> {:error, :not_found}
-    end
-  end
-
   @doc "Get the current session status."
   @spec get_status(pid() | String.t()) :: {:ok, atom()}
   def get_status(pid) when is_pid(pid) do
@@ -97,31 +85,6 @@ defmodule Loom.Session do
     end
   end
 
-  @doc "Set the session mode (:normal or :architect)."
-  @spec set_mode(pid() | String.t(), :normal | :architect) :: :ok | {:error, term()}
-  def set_mode(pid, mode) when is_pid(pid) and mode in [:normal, :architect] do
-    GenServer.call(pid, {:set_mode, mode})
-  end
-
-  def set_mode(session_id, mode) when is_binary(session_id) do
-    case Loom.Session.Manager.find_session(session_id) do
-      {:ok, pid} -> set_mode(pid, mode)
-      :error -> {:error, :not_found}
-    end
-  end
-
-  @doc "Get the current session mode (:normal or :architect)."
-  @spec get_mode(pid() | String.t()) :: {:ok, :normal | :architect}
-  def get_mode(pid) when is_pid(pid) do
-    GenServer.call(pid, :get_mode)
-  end
-
-  def get_mode(session_id) when is_binary(session_id) do
-    case Loom.Session.Manager.find_session(session_id) do
-      {:ok, pid} -> get_mode(pid)
-      :error -> {:error, :not_found}
-    end
-  end
 
   # --- GenServer Callbacks ---
 
@@ -156,55 +119,19 @@ defmodule Loom.Session do
   end
 
   @impl true
-  def handle_call({:send_message, text}, from, state) do
+  def handle_call({:send_message, text}, _from, state) do
     state = update_status(state, :thinking)
 
-    case state.mode do
-      :architect ->
-        # Architect mode: plan with strong model, execute with fast model
-        case Architect.run(text, state) do
-          {:ok, response_text, state} ->
-            state = update_status(state, :idle)
-            {:reply, {:ok, response_text}, state}
+    # Always use architect mode — plan with primary model, execute with
+    # secondary model only when the user has explicitly configured one.
+    case Architect.run(text, state, architect_model: state.model) do
+      {:ok, response_text, state} ->
+        state = update_status(state, :idle)
+        {:reply, {:ok, response_text}, state}
 
-          {:error, reason, state} ->
-            state = update_status(state, :idle)
-            {:reply, {:error, reason}, state}
-        end
-
-      :normal ->
-        # Normal mode: delegate to AgentLoop
-        # 1. Save user message to DB
-        {:ok, _user_msg} =
-          Persistence.save_message(%{
-            session_id: state.id,
-            role: :user,
-            content: text
-          })
-
-        user_message = %{role: :user, content: text}
-        state = %{state | messages: state.messages ++ [user_message]}
-        broadcast(state.id, {:new_message, state.id, user_message})
-
-        # 2. Run the agent loop via AgentLoop
-        loop_opts = build_loop_opts(state)
-
-        case AgentLoop.run(state.messages, loop_opts) do
-          {:ok, response_text, messages, _metadata} ->
-            state = sync_messages_from_loop(state, messages)
-            state = update_status(state, :idle)
-            {:reply, {:ok, response_text}, state}
-
-          {:error, reason, messages} ->
-            state = sync_messages_from_loop(state, messages)
-            state = update_status(state, :idle)
-            {:reply, {:error, reason}, state}
-
-          {:pending_permission, pending_info, messages} ->
-            state = sync_messages_from_loop(state, messages)
-            pending = Map.put(pending_info, :from, from)
-            {:noreply, %{state | pending_permission: pending}}
-        end
+      {:error, reason, state} ->
+        state = update_status(state, :idle)
+        {:reply, {:error, reason}, state}
     end
   end
 
@@ -224,171 +151,8 @@ defmodule Loom.Session do
     {:reply, {:ok, state.status}, state}
   end
 
-  @impl true
-  def handle_call({:set_mode, mode}, _from, state) do
-    broadcast(state.id, {:mode_changed, state.id, mode})
-    {:reply, :ok, %{state | mode: mode}}
-  end
 
-  @impl true
-  def handle_call(:get_mode, _from, state) do
-    {:reply, {:ok, state.mode}, state}
-  end
-
-  @impl true
-  def handle_cast({:permission_response, action, _meta}, state) do
-    pending = state.pending_permission
-    pending_data = pending.pending_data
-
-    result_text =
-      case action do
-        "allow_once" ->
-          AgentLoop.default_run_tool(pending_data.tool_module, pending_data.tool_args, pending_data.context)
-
-        "allow_always" ->
-          Loom.Permissions.Manager.grant(pending_data.tool_name, "*", state.id)
-          AgentLoop.default_run_tool(pending_data.tool_module, pending_data.tool_args, pending_data.context)
-
-        "deny" ->
-          "Error: Permission denied by user for #{pending_data.tool_name} on #{pending_data.tool_path}"
-      end
-
-    from = pending.from
-
-    case AgentLoop.resume(result_text, pending, state.messages) do
-      {:ok, response_text, messages, _metadata} ->
-        state = sync_messages_from_loop(state, messages)
-        state = update_status(state, :idle)
-        state = %{state | pending_permission: nil}
-        GenServer.reply(from, {:ok, response_text})
-        {:noreply, state}
-
-      {:error, reason, messages} ->
-        state = sync_messages_from_loop(state, messages)
-        state = update_status(state, :idle)
-        state = %{state | pending_permission: nil}
-        GenServer.reply(from, {:error, reason})
-        {:noreply, state}
-
-      {:pending_permission, new_pending_info, messages} ->
-        state = sync_messages_from_loop(state, messages)
-        new_pending = Map.put(new_pending_info, :from, from)
-        {:noreply, %{state | pending_permission: new_pending}}
-    end
-  end
-
-  # --- Private: AgentLoop integration ----------------------------------------
-
-  defp build_loop_opts(state) do
-    session_id = state.id
-
-    [
-      model: state.model,
-      tools: state.tools,
-      system_prompt: build_system_prompt(state),
-      max_iterations: 25,
-      project_path: state.project_path,
-      session_id: session_id,
-      on_event: fn event_name, payload ->
-        handle_loop_event(session_id, event_name, payload)
-      end,
-      check_permission: fn tool_name, tool_path ->
-        check_permission(tool_name, tool_path, state)
-      end
-    ]
-  end
-
-  defp handle_loop_event(session_id, event_name, payload) do
-    case event_name do
-      :new_message ->
-        # Persist the message and broadcast
-        persist_loop_message(session_id, payload)
-        broadcast(session_id, {:new_message, session_id, payload})
-
-      :tool_executing ->
-        broadcast(session_id, {:tool_executing, session_id, payload.tool_name})
-
-      :tool_complete ->
-        broadcast(session_id, {:tool_complete, session_id, payload.tool_name, payload.result})
-
-      :tool_calls_received ->
-        update_status_by_id(session_id, :executing_tool)
-
-      :usage ->
-        Persistence.update_costs(
-          session_id,
-          payload.input_tokens,
-          payload.output_tokens,
-          payload.total_cost
-        )
-
-      _ ->
-        :ok
-    end
-  end
-
-  defp persist_loop_message(session_id, %{role: :assistant} = msg) do
-    attrs = %{session_id: session_id, role: :assistant, content: msg.content}
-
-    attrs =
-      if msg[:tool_calls] && msg[:tool_calls] != [] do
-        Map.put(attrs, :tool_calls, encode_tool_calls(msg.tool_calls))
-      else
-        attrs
-      end
-
-    {:ok, _} = Persistence.save_message(attrs)
-  end
-
-  defp persist_loop_message(session_id, %{role: :tool} = msg) do
-    {:ok, _} =
-      Persistence.save_message(%{
-        session_id: session_id,
-        role: :tool,
-        content: msg.content,
-        tool_call_id: msg[:tool_call_id]
-      })
-  end
-
-  defp persist_loop_message(_session_id, _msg), do: :ok
-
-  defp sync_messages_from_loop(state, messages) do
-    %{state | messages: messages}
-  end
-
-  # --- Private: Session-specific logic ----------------------------------------
-
-  defp check_permission(tool_name, tool_path, state) do
-    case Loom.Permissions.Manager.check(tool_name, tool_path, state.id) do
-      :allowed ->
-        :allowed
-
-      :ask ->
-        if state.auto_approve do
-          Loom.Permissions.Manager.grant(tool_name, tool_path, state.id)
-          :allowed
-        else
-          # Broadcast permission request to LiveView instead of blocking on terminal I/O
-          broadcast(state.id, {:permission_request, state.id, tool_name, tool_path})
-          {:pending, %{}}
-        end
-    end
-  end
-
-  defp build_system_prompt(state) do
-    """
-    You are Loom, an AI coding assistant. You help users write, debug, and maintain software.
-
-    Project path: #{state.project_path}
-    Model: #{state.model}
-
-    Guidelines:
-    - Read files before modifying them
-    - Explain your reasoning before making changes
-    - Prefer minimal, focused edits over large rewrites
-    - Always consider security implications
-    """
-  end
+  # --- Private ----------------------------------------
 
   defp load_or_create_session(session_id, model, project_path, title) do
     case Persistence.get_session(session_id) do
@@ -436,16 +200,6 @@ defmodule Loom.Session do
     end
   end
 
-  defp encode_tool_calls(tool_calls) do
-    Enum.map(tool_calls, fn tc ->
-      %{
-        "id" => tc[:id],
-        "name" => tc[:name],
-        "arguments" => tc[:arguments]
-      }
-    end)
-  end
-
   defp update_status(state, new_status) do
     # Update registry metadata
     if state.id do
@@ -455,14 +209,6 @@ defmodule Loom.Session do
     broadcast(state.id, {:session_status, state.id, new_status})
 
     %{state | status: new_status}
-  end
-
-  defp update_status_by_id(session_id, new_status) do
-    if session_id do
-      Registry.update_value(Loom.SessionRegistry, session_id, fn _ -> new_status end)
-    end
-
-    broadcast(session_id, {:session_status, session_id, new_status})
   end
 
   defp default_model do

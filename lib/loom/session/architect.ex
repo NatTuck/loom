@@ -555,15 +555,20 @@ defmodule Loom.Session.Architect do
   end
 
   defp resolve_architect_model(opts) do
+    # Use the user-selected model (passed via opts from the session).
+    # Falls back to config, then a sensible default.
     Keyword.get(opts, :architect_model) ||
-      Loom.Config.get(:model, :architect) ||
-      "anthropic:claude-opus-4-6"
+      Loom.Config.get(:model, :default) ||
+      "anthropic:claude-sonnet-4-6"
   end
 
   defp resolve_editor_model(opts) do
+    # Only use a secondary model when the user has explicitly configured one.
+    # If no secondary model is set, fall back to the architect (primary) model
+    # so everything runs on the single model the user selected.
     Keyword.get(opts, :editor_model) ||
       Loom.Config.get(:model, :editor) ||
-      "anthropic:claude-haiku-4-5"
+      resolve_architect_model(opts)
   end
 
   defp update_usage(session_id, response) do

@@ -14,7 +14,6 @@ defmodule LoomWeb.WorkspaceLive do
         status: :idle,
         active_tab: :files,
         model: @default_model,
-        mode: :normal,
         input_text: "",
         current_tool: nil,
         current_tool_name: nil,
@@ -122,11 +121,6 @@ defmodule LoomWeb.WorkspaceLive do
     {:noreply, assign(socket, selected_file: nil, file_content: nil)}
   end
 
-  def handle_event("toggle_mode", _params, socket) do
-    new_mode = if socket.assigns.mode == :normal, do: :architect, else: :normal
-    Session.set_mode(socket.assigns.session_id, new_mode)
-    {:noreply, assign(socket, mode: new_mode)}
-  end
 
   def handle_event("permission_response", %{"action" => _action}, socket) do
     # Placeholder for when permissions are wired up
@@ -173,10 +167,6 @@ defmodule LoomWeb.WorkspaceLive do
 
   def handle_info({:permission_request, _session_id, tool_name, tool_path}, socket) do
     {:noreply, assign(socket, permission_request: %{tool_name: tool_name, tool_path: tool_path})}
-  end
-
-  def handle_info({:mode_changed, _session_id, mode}, socket) do
-    {:noreply, assign(socket, mode: mode)}
   end
 
   def handle_info({:architect_phase, _phase}, socket) do
@@ -300,24 +290,6 @@ defmodule LoomWeb.WorkspaceLive do
 
           <%!-- Model selector --%>
           <.live_component module={LoomWeb.ModelSelectorComponent} id="model-selector" model={@model} />
-
-          <%!-- Mode toggle: segmented pill --%>
-          <div class="relative flex items-center bg-gray-800/80 rounded-full p-0.5">
-            <button
-              phx-click="toggle_mode"
-              class={"relative z-10 text-xs px-3 py-1 rounded-full font-medium transition-colors duration-200 " <>
-                if(@mode == :normal, do: "bg-violet-600/80 text-white", else: "text-gray-400 hover:text-gray-300")}
-            >
-              Normal
-            </button>
-            <button
-              phx-click="toggle_mode"
-              class={"relative z-10 text-xs px-3 py-1 rounded-full font-medium transition-colors duration-200 " <>
-                if(@mode == :architect, do: "bg-violet-600/80 text-white", else: "text-gray-400 hover:text-gray-300")}
-            >
-              Architect
-            </button>
-          </div>
         </div>
 
         <div class="flex items-center gap-3">
