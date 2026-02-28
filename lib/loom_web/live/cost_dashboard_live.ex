@@ -31,10 +31,10 @@ defmodule LoomWeb.CostDashboardLive do
       <div class="max-w-7xl mx-auto">
         <div class="flex items-center justify-between mb-8">
           <div>
-            <h1 class="text-2xl font-bold text-indigo-400">Cost Dashboard</h1>
+            <h1 class="text-2xl font-bold text-violet-400">Cost Dashboard</h1>
             <p class="text-sm text-gray-500 mt-1">Real-time telemetry and usage metrics</p>
           </div>
-          <a href="/" class="text-sm text-indigo-400 hover:text-indigo-300">
+          <a href="/" class="text-sm text-violet-400 hover:text-violet-300">
             Back to Workspace
           </a>
         </div>
@@ -83,7 +83,7 @@ defmodule LoomWeb.CostDashboardLive do
                     :for={s <- @sessions}
                     class="border-b border-gray-800/50 hover:bg-gray-800/30"
                   >
-                    <td class="px-4 py-2 font-mono text-indigo-400">
+                    <td class="px-4 py-2 font-mono text-violet-400">
                       {short_id(s.session_id)}
                     </td>
                     <td class="px-4 py-2 text-right text-gray-300">
@@ -125,7 +125,7 @@ defmodule LoomWeb.CostDashboardLive do
                 </div>
                 <div class="w-full bg-gray-800 rounded-full h-2">
                   <div
-                    class="bg-indigo-500 h-2 rounded-full"
+                    class="bg-violet-500 h-2 rounded-full"
                     style={"width: #{bar_width(count, @models)}%"}
                   >
                   </div>

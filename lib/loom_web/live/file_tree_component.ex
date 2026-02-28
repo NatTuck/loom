@@ -96,7 +96,7 @@ defmodule LoomWeb.FileTreeComponent do
             value={@filter}
             phx-keyup="filter"
             phx-target={@myself}
-            class="w-full pl-8 pr-8 py-1.5 text-xs bg-gray-800/60 border border-gray-700/50 rounded-lg text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/50 transition-shadow"
+            class="w-full pl-8 pr-8 py-1.5 text-xs bg-gray-800/60 border border-gray-700/50 rounded-lg text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-shadow"
           />
           <button
             :if={@filter != ""}
@@ -144,7 +144,7 @@ defmodule LoomWeb.FileTreeComponent do
             <span class={"text-gray-500 w-3.5 text-center text-[10px] chevron-rotate " <> if(MapSet.member?(@expanded_dirs, entry.path), do: "expanded", else: "")}>
               &#9654;
             </span>
-            <.icon name="hero-folder-mini" class={"w-3.5 h-3.5 flex-shrink-0 transition-colors " <> if(MapSet.member?(@expanded_dirs, entry.path), do: "text-indigo-400", else: "text-indigo-500/60 group-hover:text-indigo-400")} />
+            <.icon name="hero-folder-mini" class={"w-3.5 h-3.5 flex-shrink-0 transition-colors " <> if(MapSet.member?(@expanded_dirs, entry.path), do: "text-violet-400", else: "text-violet-500/60 group-hover:text-violet-400")} />
             <span class="text-gray-300 group-hover:text-gray-200 text-xs transition-colors">{entry.name}</span>
           </div>
           <%= if MapSet.member?(@expanded_dirs, entry.path) do %>
@@ -157,7 +157,7 @@ defmodule LoomWeb.FileTreeComponent do
           <% end %>
         <% else %>
           <div
-            class="flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer hover:bg-indigo-500/5 select-none group transition-colors duration-150"
+            class="flex items-center gap-1.5 px-1.5 py-1 rounded-md cursor-pointer hover:bg-violet-500/5 select-none group transition-colors duration-150"
             style={"padding-left: #{@depth * 16 + 20}px"}
             phx-click="select_file"
             phx-value-path={entry.path}

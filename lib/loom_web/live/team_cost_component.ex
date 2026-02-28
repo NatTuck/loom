@@ -251,7 +251,7 @@ defmodule LoomWeb.TeamCostComponent do
         <div class="flex items-end gap-1 h-20">
           <div
             :for={bucket <- @timeline}
-            class="flex-1 bg-indigo-500/80 hover:bg-indigo-400 rounded-t transition-colors cursor-default group relative"
+            class="flex-1 bg-violet-500/80 hover:bg-violet-400 rounded-t transition-colors cursor-default group relative"
             style={"height: #{timeline_bar_height(bucket.cost, @timeline)}%"}
           >
             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[10px] text-gray-300 whitespace-nowrap z-10">
@@ -345,7 +345,7 @@ defmodule LoomWeb.TeamCostComponent do
       String.contains?(model, "sonnet") -> "text-blue-400"
       String.contains?(model, "haiku") -> "text-teal-400"
       String.contains?(model, "glm") -> "text-emerald-400"
-      true -> "text-indigo-400"
+      true -> "text-violet-400"
     end
   end
 

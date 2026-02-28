@@ -14,7 +14,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: "#818cf8",
+        brand: "#7C3AED",
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',

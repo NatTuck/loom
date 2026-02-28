@@ -4,7 +4,7 @@
 
 /* Loom dark theme defaults */
 body {
-  @apply bg-gray-950 text-gray-100;
+  @apply bg-slate-950 text-gray-100;
 }
 
 /* Phoenix LiveView loading states */
@@ -37,18 +37,18 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4f46e5;
+  background: #7c3aed;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6366f1;
+  background: #8b5cf6;
 }
 
 /* ── Focus Ring Override ── */
 *:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.3);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
   border-radius: inherit;
 }
 
@@ -85,8 +85,8 @@ body {
 
 /* ── Header Bottom Glow ── */
 .header-glow {
-  box-shadow: 0 1px 0 0 rgba(129, 140, 248, 0.15),
-              0 4px 12px -4px rgba(129, 140, 248, 0.08);
+  box-shadow: 0 1px 0 0 rgba(124, 58, 237, 0.15),
+              0 4px 12px -4px rgba(124, 58, 237, 0.08);
 }
 
 /* ── Chevron Rotation ── */
@@ -128,8 +128,8 @@ body {
 }
 
 @keyframes send-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.3); }
-  50% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(124, 58, 237, 0); }
 }
 
 /* ── Bounce Dots (Thinking) ── */
@@ -205,11 +205,11 @@ body {
 }
 
 .chat-markdown code:not(pre code) {
-  @apply bg-gray-800 rounded px-1.5 py-0.5 text-xs text-indigo-300;
+  @apply bg-gray-800 rounded px-1.5 py-0.5 text-xs text-violet-300;
 }
 
 .chat-markdown a {
-  @apply text-indigo-400 hover:text-indigo-300 underline underline-offset-2;
+  @apply text-violet-400 hover:text-violet-300 underline underline-offset-2;
   transition: color 0.15s ease;
 }
 
@@ -222,5 +222,5 @@ body {
 }
 
 .chat-markdown blockquote {
-  @apply border-l-2 border-indigo-500/30 pl-3 text-gray-400 italic;
+  @apply border-l-2 border-violet-500/30 pl-3 text-gray-400 italic;
 }

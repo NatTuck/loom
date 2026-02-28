@@ -37,7 +37,7 @@ defmodule LoomWeb.SessionSwitcherComponent do
         <button
           phx-click="new_session"
           phx-target={@myself}
-          class="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-indigo-400 hover:bg-indigo-500/10 transition-colors border-b border-gray-800"
+          class="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-violet-400 hover:bg-violet-500/10 transition-colors border-b border-gray-800"
         >
           <.icon name="hero-plus-mini" class="w-3.5 h-3.5" />
           <span class="font-medium">New Session</span>
@@ -52,11 +52,11 @@ defmodule LoomWeb.SessionSwitcherComponent do
             phx-target={@myself}
             class={"w-full flex items-center gap-2 px-4 py-2 text-xs transition-colors " <>
               if(session.id == @session_id,
-                do: "bg-indigo-500/10 text-indigo-400",
+                do: "bg-violet-500/10 text-violet-400",
                 else: "text-gray-400 hover:bg-gray-800/60 hover:text-gray-300")}
           >
             <span :if={session.id == @session_id} class="flex-shrink-0">
-              <.icon name="hero-check-mini" class="w-3.5 h-3.5 text-indigo-400" />
+              <.icon name="hero-check-mini" class="w-3.5 h-3.5 text-violet-400" />
             </span>
             <span :if={session.id != @session_id} class="w-3.5 flex-shrink-0" />
             <span class="truncate flex-1 text-left">{session_label(session)}</span>

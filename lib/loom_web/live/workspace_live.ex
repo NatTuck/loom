@@ -293,7 +293,7 @@ defmodule LoomWeb.WorkspaceLive do
           <%!-- Branding --%>
           <div class="flex items-center gap-2">
             <span class="text-base opacity-70">&#129525;</span>
-            <span class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
+            <span class="text-xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
               Loom
             </span>
           </div>
@@ -306,14 +306,14 @@ defmodule LoomWeb.WorkspaceLive do
             <button
               phx-click="toggle_mode"
               class={"relative z-10 text-xs px-3 py-1 rounded-full font-medium transition-colors duration-200 " <>
-                if(@mode == :normal, do: "bg-indigo-600/80 text-white", else: "text-gray-400 hover:text-gray-300")}
+                if(@mode == :normal, do: "bg-violet-600/80 text-white", else: "text-gray-400 hover:text-gray-300")}
             >
               Normal
             </button>
             <button
               phx-click="toggle_mode"
               class={"relative z-10 text-xs px-3 py-1 rounded-full font-medium transition-colors duration-200 " <>
-                if(@mode == :architect, do: "bg-indigo-600/80 text-white", else: "text-gray-400 hover:text-gray-300")}
+                if(@mode == :architect, do: "bg-violet-600/80 text-white", else: "text-gray-400 hover:text-gray-300")}
             >
               Architect
             </button>
@@ -326,7 +326,7 @@ defmodule LoomWeb.WorkspaceLive do
             href="/dashboard"
             class="flex items-center gap-1.5 bg-gray-800/60 hover:bg-gray-800 rounded-full px-3 py-1.5 transition-colors group"
           >
-            <.icon name="hero-sparkles-mini" class="w-3.5 h-3.5 text-indigo-400 group-hover:text-indigo-300" />
+            <.icon name="hero-sparkles-mini" class="w-3.5 h-3.5 text-violet-400 group-hover:text-violet-300" />
             <span class="text-xs font-mono text-gray-300">${format_cost(@session_cost)}</span>
             <span class="text-[10px] text-gray-500 font-mono">{format_tokens(@session_tokens)} tok</span>
           </a>
@@ -362,7 +362,7 @@ defmodule LoomWeb.WorkspaceLive do
                   name="text"
                   rows="1"
                   placeholder="What should we work on?"
-                  class="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-3 text-sm text-gray-100 resize-none placeholder-gray-500 placeholder:italic focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/50 transition-shadow"
+                  class="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-3 text-sm text-gray-100 resize-none placeholder-gray-500 placeholder:italic focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-shadow"
                   phx-hook="ShiftEnterSubmit"
                   id="message-input"
                 ><%= @input_text %></textarea>
@@ -370,7 +370,7 @@ defmodule LoomWeb.WorkspaceLive do
               <button
                 type="submit"
                 class={"flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-200 " <>
-                  if(@status == :idle, do: "bg-indigo-600 hover:bg-indigo-500 text-white send-btn-ready", else: "bg-gray-800 text-gray-600 cursor-not-allowed")}
+                  if(@status == :idle, do: "bg-violet-600 hover:bg-violet-500 text-white send-btn-ready", else: "bg-gray-800 text-gray-600 cursor-not-allowed")}
                 disabled={@status != :idle}
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -395,7 +395,7 @@ defmodule LoomWeb.WorkspaceLive do
               phx-value-tab={tab}
               class={"flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 " <>
                 if(@active_tab == tab,
-                  do: "bg-gray-800 text-indigo-400",
+                  do: "bg-gray-800 text-violet-400",
                   else: "text-gray-500 hover:text-gray-300 hover:bg-gray-800/40")}
             >
               <span class="text-sm">{tab_icon(tab)}</span>
@@ -416,12 +416,12 @@ defmodule LoomWeb.WorkspaceLive do
   # --- Helpers ---
 
   defp status_pill_class(:idle), do: "bg-green-900/30 text-green-400"
-  defp status_pill_class(:thinking), do: "bg-indigo-900/30 text-indigo-400"
+  defp status_pill_class(:thinking), do: "bg-violet-900/30 text-violet-400"
   defp status_pill_class(:executing_tool), do: "bg-blue-900/30 text-blue-400"
   defp status_pill_class(_), do: "bg-gray-800/60 text-gray-400"
 
   defp status_dot_class(:idle), do: "w-2 h-2 rounded-full bg-green-400 status-dot-idle"
-  defp status_dot_class(:thinking), do: "w-2 h-2 rounded-full bg-indigo-400 status-dot-thinking"
+  defp status_dot_class(:thinking), do: "w-2 h-2 rounded-full bg-violet-400 status-dot-thinking"
   defp status_dot_class(:executing_tool), do: "w-2 h-2 rounded-full bg-blue-400 animate-spin"
   defp status_dot_class(_), do: "w-2 h-2 rounded-full bg-gray-500"
 
@@ -457,8 +457,8 @@ defmodule LoomWeb.WorkspaceLive do
       <div :if={@selected_file} class="h-1/2 border-t border-gray-800 flex flex-col animate-fade-in">
         <div class="flex items-center justify-between px-3 py-2 bg-gray-900/80 border-b border-gray-800">
           <div class="flex items-center gap-2 truncate">
-            <.icon name="hero-document-text-mini" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-            <span class="text-xs text-indigo-400 font-mono truncate">{@selected_file}</span>
+            <.icon name="hero-document-text-mini" class="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+            <span class="text-xs text-violet-400 font-mono truncate">{@selected_file}</span>
           </div>
           <button
             phx-click="deselect_file"
@@ -519,7 +519,7 @@ defmodule LoomWeb.WorkspaceLive do
           phx-value-tab={sub}
           class={"px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 " <>
             if(@team_sub_tab == sub,
-              do: "bg-gray-800 text-indigo-400",
+              do: "bg-gray-800 text-violet-400",
               else: "text-gray-500 hover:text-gray-300 hover:bg-gray-800/40")}
         >
           {team_sub_tab_label(sub)}

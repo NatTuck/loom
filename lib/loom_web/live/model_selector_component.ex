@@ -2,18 +2,26 @@ defmodule LoomWeb.ModelSelectorComponent do
   use LoomWeb, :live_component
 
   def update(assigns, socket) do
-    models = Loom.Models.available_models_enriched()
+    all_providers = Loom.Models.all_providers_enriched()
+
+    # Split into configured (has key + models) and unconfigured
+    {active, unconfigured} =
+      Enum.split_with(all_providers, fn {_p, _name, status, models} ->
+        match?({:set, _}, status) and models != []
+      end)
 
     {:ok,
      socket
      |> assign(assigns)
      |> assign(
-       models: models,
-       all_providers: Loom.Models.all_providers_enriched(),
+       active_providers: active,
+       unconfigured_providers: unconfigured,
+       all_providers: all_providers,
        custom_mode: false,
        custom_value: "",
        open: false,
-       search: ""
+       search: "",
+       show_unconfigured: false
      )}
   end
 
@@ -25,10 +33,9 @@ defmodule LoomWeb.ModelSelectorComponent do
         type="button"
         phx-click="toggle_dropdown"
         phx-target={@myself}
-        class="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5 transition-all duration-200 cursor-pointer group"
+        class="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border border-gray-700/50 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:border-violet-500/30 hover:shadow-lg hover:shadow-violet-500/5 transition-all duration-200 cursor-pointer group"
       >
-        <span class="text-xs opacity-70">{provider_emoji(current_provider(@model))}</span>
-        <span class="truncate max-w-[160px] text-gray-200 group-hover:text-gray-100">
+        <span class="truncate max-w-[180px] text-gray-200 group-hover:text-gray-100">
           {current_model_label(@model, @all_providers)}
         </span>
         <svg
@@ -45,12 +52,12 @@ defmodule LoomWeb.ModelSelectorComponent do
       <%!-- Dropdown Panel --%>
       <div
         :if={@open}
-        class="absolute top-full left-0 mt-2 w-80 bg-gray-900 border border-gray-700/50 rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden"
+        class="absolute top-full left-0 mt-2 w-80 bg-gray-900/95 backdrop-blur-sm border border-gray-700/50 rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden"
         phx-click-away="close_dropdown"
         phx-target={@myself}
       >
         <%!-- Search Input --%>
-        <div class="p-2 border-b border-gray-800">
+        <div class="p-2 border-b border-gray-800/80">
           <div class="relative">
             <svg
               class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500"
@@ -72,89 +79,93 @@ defmodule LoomWeb.ModelSelectorComponent do
               phx-keyup="search_models"
               phx-target={@myself}
               id="model-search-input"
-              class="w-full bg-gray-800/60 border border-gray-700/50 text-gray-300 text-xs rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/30 placeholder-gray-600"
+              class="w-full bg-gray-800/60 border border-gray-700/50 text-gray-300 text-xs rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/30 placeholder-gray-600"
             />
           </div>
         </div>
 
-        <%!-- Model List --%>
+        <%!-- Active Providers (with keys + models) --%>
         <div class="max-h-72 overflow-y-auto overscroll-contain" id="model-list">
-          <%= for {provider_atom, display_name, key_status, models} <- filtered_providers(@all_providers, @search) do %>
-            <div class="px-2 pt-3 pb-1">
-              <%!-- Provider Header --%>
-              <div class="flex items-center justify-between px-2 mb-1">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-xs">{provider_emoji(provider_atom)}</span>
-                  <span class="text-xs font-medium text-gray-400">{display_name}</span>
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <%= case key_status do %>
-                    <% {:set, _env_var} -> %>
-                      <span class="flex items-center gap-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                        <span class="text-[10px] text-emerald-400/80">Ready</span>
-                      </span>
-                    <% {:missing, env_var} -> %>
-                      <span class="flex items-center gap-1">
-                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                        <span class="text-[10px] text-amber-400/80 font-mono">{env_var}</span>
-                      </span>
-                  <% end %>
-                </div>
-              </div>
-
-              <%!-- Models in this provider --%>
-              <%= if models == [] do %>
-                <div class="px-2 py-1.5 text-[10px] text-gray-600 italic">No models available</div>
-              <% else %>
-                <%= for {label, value, context_k} <- models do %>
-                  <button
-                    type="button"
-                    phx-click="select_model"
-                    phx-value-model={value}
-                    phx-target={@myself}
-                    class={"flex items-center justify-between w-full px-2 py-1.5 rounded-lg text-left transition-all duration-150 group/item #{if value == @model, do: "bg-indigo-500/20 ring-1 ring-indigo-500/30", else: "hover:bg-indigo-500/10 hover:ring-1 hover:ring-indigo-500/20"}"}
-                  >
-                    <div class="flex items-center gap-2 min-w-0">
-                      <%= if value == @model do %>
-                        <svg
-                          class="w-3 h-3 text-indigo-400 shrink-0"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          stroke-width="3"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      <% else %>
-                        <div class="w-3 h-3 shrink-0"></div>
-                      <% end %>
-                      <span class={"text-xs truncate #{if value == @model, do: "text-indigo-300 font-medium", else: "text-gray-300 group-hover/item:text-gray-100"}"}>
-                        {label}
-                      </span>
-                    </div>
-                    <span
-                      :if={context_k}
-                      class="text-[10px] text-gray-600 font-mono shrink-0 ml-2"
-                    >
-                      {context_k}
-                    </span>
-                  </button>
-                <% end %>
-              <% end %>
+          <%= if filtered_active(@active_providers, @search) == [] and @search != "" do %>
+            <%!-- Search across all providers when filtering --%>
+            <%= for {provider_atom, display_name, key_status, models} <- filtered_active(@unconfigured_providers, @search) do %>
+              <.provider_group
+                provider_atom={provider_atom}
+                display_name={display_name}
+                key_status={key_status}
+                models={models}
+                current_model={@model}
+                myself={@myself}
+              />
+            <% end %>
+            <div :if={filtered_active(@unconfigured_providers, @search) == []} class="px-4 py-6 text-center">
+              <p class="text-xs text-gray-500">No models match "<span class="text-gray-400">{@search}</span>"</p>
             </div>
+          <% else %>
+            <%= for {provider_atom, display_name, key_status, models} <- filtered_active(@active_providers, @search) do %>
+              <.provider_group
+                provider_atom={provider_atom}
+                display_name={display_name}
+                key_status={key_status}
+                models={models}
+                current_model={@model}
+                myself={@myself}
+              />
+            <% end %>
           <% end %>
+
+          <%!-- Empty state when no providers configured --%>
+          <div :if={@active_providers == [] and @search == ""} class="px-4 py-6 text-center">
+            <div class="text-2xl mb-2">🔑</div>
+            <p class="text-xs text-gray-400 font-medium">No API keys configured</p>
+            <p class="text-[11px] text-gray-600 mt-1">
+              Add provider keys to your <span class="font-mono text-gray-500">.env</span> file to get started
+            </p>
+          </div>
         </div>
 
         <%!-- API Key Warning Banner --%>
         <.key_warning_banner model={@model} all_providers={@all_providers} />
 
+        <%!-- Unconfigured Providers (collapsible) --%>
+        <div :if={@unconfigured_providers != [] and @search == ""} class="border-t border-gray-800/80">
+          <button
+            type="button"
+            phx-click="toggle_unconfigured"
+            phx-target={@myself}
+            class="flex items-center justify-between w-full px-3 py-2 text-xs text-gray-500 hover:text-gray-400 transition-colors duration-150"
+          >
+            <span class="flex items-center gap-1.5">
+              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              {length(@unconfigured_providers)} more providers available
+            </span>
+            <svg
+              class={"w-3 h-3 transition-transform duration-200 #{if @show_unconfigured, do: "rotate-180"}"}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div :if={@show_unconfigured} class="max-h-48 overflow-y-auto border-t border-gray-800/50 bg-gray-950/50">
+            <%= for {_provider_atom, display_name, {:missing, env_var}, _models} <- @unconfigured_providers do %>
+              <div class="flex items-center justify-between px-3 py-1.5 group/setup">
+                <span class="text-[11px] text-gray-600">{display_name}</span>
+                <span class="text-[10px] text-gray-700 font-mono group-hover/setup:text-amber-500/70 transition-colors duration-150">
+                  {env_var}
+                </span>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
         <%!-- Custom Model Section --%>
-        <div class="border-t border-gray-800 p-2">
+        <div class="border-t border-gray-800/80 p-2">
           <%= if @custom_mode do %>
             <form phx-submit="apply_custom" phx-target={@myself} class="flex items-center gap-1.5">
               <input
@@ -165,11 +176,11 @@ defmodule LoomWeb.ModelSelectorComponent do
                 autofocus
                 phx-keydown="custom_key"
                 phx-target={@myself}
-                class="flex-1 bg-gray-800/60 border border-gray-700/50 text-gray-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 font-mono placeholder-gray-600"
+                class="flex-1 bg-gray-800/60 border border-gray-700/50 text-gray-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500/50 font-mono placeholder-gray-600"
               />
               <button
                 type="submit"
-                class="text-xs text-indigo-400 hover:text-indigo-300 px-2 py-1.5 rounded-md hover:bg-indigo-500/10 transition-colors duration-150"
+                class="text-xs text-violet-400 hover:text-violet-300 px-2 py-1.5 rounded-md hover:bg-violet-500/10 transition-colors duration-150"
               >
                 Use
               </button>
@@ -197,6 +208,75 @@ defmodule LoomWeb.ModelSelectorComponent do
           <% end %>
         </div>
       </div>
+    </div>
+    """
+  end
+
+  # --- Provider Group Component ---
+
+  defp provider_group(assigns) do
+    ~H"""
+    <div class="px-2 pt-3 pb-1">
+      <%!-- Provider Header --%>
+      <div class="flex items-center justify-between px-2 mb-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{@display_name}</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <%= case @key_status do %>
+            <% {:set, _env_var} -> %>
+              <span class="flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span class="text-[10px] text-emerald-400/70">Connected</span>
+              </span>
+            <% {:missing, env_var} -> %>
+              <span class="flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400/60"></span>
+                <span class="text-[10px] text-amber-400/60 font-mono">{env_var}</span>
+              </span>
+          <% end %>
+        </div>
+      </div>
+
+      <%!-- Models --%>
+      <%= for {label, value, context_k} <- @models do %>
+        <button
+          type="button"
+          phx-click="select_model"
+          phx-value-model={value}
+          phx-target={@myself}
+          class={"flex items-center justify-between w-full px-2 py-1.5 rounded-lg text-left transition-all duration-150 group/item #{if value == @current_model, do: "bg-violet-500/15 ring-1 ring-violet-500/25", else: "hover:bg-gray-800/80"}"}
+        >
+          <div class="flex items-center gap-2 min-w-0">
+            <%= if value == @current_model do %>
+              <svg
+                class="w-3 h-3 text-violet-400 shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="3"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            <% else %>
+              <div class="w-3 h-3 shrink-0"></div>
+            <% end %>
+            <span class={"text-xs truncate #{if value == @current_model, do: "text-violet-300 font-medium", else: "text-gray-300 group-hover/item:text-gray-100"}"}>
+              {label}
+            </span>
+          </div>
+          <span
+            :if={context_k}
+            class="text-[10px] text-gray-600 font-mono shrink-0 ml-2"
+          >
+            {context_k}
+          </span>
+        </button>
+      <% end %>
     </div>
     """
   end
@@ -244,11 +324,11 @@ defmodule LoomWeb.ModelSelectorComponent do
   # --- Events ---
 
   def handle_event("toggle_dropdown", _params, socket) do
-    {:noreply, assign(socket, open: !socket.assigns.open, search: "")}
+    {:noreply, assign(socket, open: !socket.assigns.open, search: "", show_unconfigured: false)}
   end
 
   def handle_event("close_dropdown", _params, socket) do
-    {:noreply, assign(socket, open: false, search: "", custom_mode: false)}
+    {:noreply, assign(socket, open: false, search: "", custom_mode: false, show_unconfigured: false)}
   end
 
   def handle_event("search_models", %{"value" => value}, socket) do
@@ -258,6 +338,10 @@ defmodule LoomWeb.ModelSelectorComponent do
   def handle_event("select_model", %{"model" => model}, socket) do
     send(self(), {:change_model, model})
     {:noreply, assign(socket, open: false, search: "")}
+  end
+
+  def handle_event("toggle_unconfigured", _params, socket) do
+    {:noreply, assign(socket, show_unconfigured: !socket.assigns.show_unconfigured)}
   end
 
   def handle_event("enter_custom", _params, socket) do
@@ -313,11 +397,11 @@ defmodule LoomWeb.ModelSelectorComponent do
 
   defp model_id_fallback(model), do: model
 
-  defp filtered_providers(providers, search) when search in [nil, ""] do
+  defp filtered_active(providers, search) when search in [nil, ""] do
     providers
   end
 
-  defp filtered_providers(providers, search) do
+  defp filtered_active(providers, search) do
     term = String.downcase(search)
 
     providers
@@ -332,22 +416,4 @@ defmodule LoomWeb.ModelSelectorComponent do
     end)
     |> Enum.reject(fn {_p, _n, _s, models} -> models == [] end)
   end
-
-  defp provider_emoji(:anthropic), do: "\u{1F7E3}"
-  defp provider_emoji(:openai), do: "\u{1F7E2}"
-  defp provider_emoji(:google), do: "\u{1F535}"
-  defp provider_emoji(:xai), do: "\u{26AB}"
-  defp provider_emoji(:zai), do: "\u{1F7E0}"
-  defp provider_emoji(:groq), do: "\u{26A1}"
-  defp provider_emoji(:deepseek), do: "\u{1F30A}"
-  defp provider_emoji(:openrouter), do: "\u{1F310}"
-  defp provider_emoji(:mistral), do: "\u{1F4A8}"
-  defp provider_emoji(:cerebras), do: "\u{1F9E0}"
-  defp provider_emoji(:togetherai), do: "\u{1F91D}"
-  defp provider_emoji(:fireworks_ai), do: "\u{1F386}"
-  defp provider_emoji(:cohere), do: "\u{1F538}"
-  defp provider_emoji(:perplexity), do: "\u{1F50D}"
-  defp provider_emoji(:nvidia), do: "\u{1F4A0}"
-  defp provider_emoji(:azure), do: "\u{2601}"
-  defp provider_emoji(_), do: "\u{2B50}"
 end

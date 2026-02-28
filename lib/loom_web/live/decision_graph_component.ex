@@ -167,7 +167,7 @@ defmodule LoomWeb.DecisionGraphComponent do
           class={[
             "px-2 py-1 text-xs rounded-full border transition-colors duration-200",
             if(@agent_filter == nil,
-              do: "border-indigo-400 text-indigo-400 bg-indigo-400/10",
+              do: "border-violet-400 text-violet-400 bg-violet-400/10",
               else: "border-gray-700 text-gray-400 hover:border-gray-500"
             )
           ]}

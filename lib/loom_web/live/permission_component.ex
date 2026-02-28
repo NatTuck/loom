@@ -11,8 +11,8 @@ defmodule LoomWeb.PermissionComponent do
       <div class="bg-gray-900 border border-gray-700/50 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-scale-in">
         <%!-- Header --%>
         <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
-            <.icon name="hero-shield-check" class="w-5 h-5 text-indigo-400" />
+          <div class="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center flex-shrink-0">
+            <.icon name="hero-shield-check" class="w-5 h-5 text-violet-400" />
           </div>
           <div>
             <h3 class="text-sm font-semibold text-gray-100">Permission Required</h3>
@@ -24,7 +24,7 @@ defmodule LoomWeb.PermissionComponent do
         <div class="space-y-3 mb-5">
           <div class="flex items-center gap-2">
             <span class="text-[10px] text-gray-500 uppercase tracking-wider">Tool</span>
-            <span class="inline-flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-3 py-1 text-xs font-mono text-indigo-400">
+            <span class="inline-flex items-center gap-1.5 bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1 text-xs font-mono text-violet-400">
               <.icon name="hero-wrench-screwdriver-mini" class="w-3 h-3" />
               {@tool_name}
             </span>
@@ -52,7 +52,7 @@ defmodule LoomWeb.PermissionComponent do
             phx-click="permission_response"
             phx-value-action="allow_once"
             phx-target={@myself}
-            class="px-4 py-2 text-xs font-medium text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-xl transition-all duration-200"
+            class="px-4 py-2 text-xs font-medium text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 rounded-xl transition-all duration-200"
           >
             Allow Once
           </button>
@@ -60,7 +60,7 @@ defmodule LoomWeb.PermissionComponent do
             phx-click="permission_response"
             phx-value-action="allow_always"
             phx-target={@myself}
-            class="px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/20"
+            class="px-4 py-2 text-xs font-medium text-white bg-violet-600 hover:bg-violet-500 rounded-xl transition-all duration-200 shadow-lg shadow-violet-500/20"
           >
             Allow Always
           </button>

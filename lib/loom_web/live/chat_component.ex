@@ -14,21 +14,21 @@ defmodule LoomWeb.ChatComponent do
         <%!-- Empty State --%>
         <div :if={@messages == []} class="flex items-center justify-center h-64">
           <div class="text-center space-y-4">
-            <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-600/20 flex items-center justify-center shadow-lg shadow-indigo-500/10">
-              <span class="text-xl font-bold text-indigo-400">L</span>
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-violet-600/20 flex items-center justify-center shadow-lg shadow-violet-500/10">
+              <span class="text-xl font-bold text-violet-400">L</span>
             </div>
             <div>
               <p class="text-lg font-medium text-gray-300">What shall we build today?</p>
               <p class="text-sm text-gray-500 mt-1">Send a message to start your coding session.</p>
             </div>
             <div class="flex flex-wrap gap-2 justify-center pt-2">
-              <span class="px-3 py-1.5 text-xs bg-gray-800/80 text-gray-400 rounded-full border border-gray-700/50 hover:border-indigo-500/30 hover:text-gray-300 transition-all duration-200 cursor-default">
+              <span class="px-3 py-1.5 text-xs bg-gray-800/80 text-gray-400 rounded-full border border-gray-700/50 hover:border-violet-500/30 hover:text-gray-300 transition-all duration-200 cursor-default">
                 Explore this codebase
               </span>
-              <span class="px-3 py-1.5 text-xs bg-gray-800/80 text-gray-400 rounded-full border border-gray-700/50 hover:border-indigo-500/30 hover:text-gray-300 transition-all duration-200 cursor-default">
+              <span class="px-3 py-1.5 text-xs bg-gray-800/80 text-gray-400 rounded-full border border-gray-700/50 hover:border-violet-500/30 hover:text-gray-300 transition-all duration-200 cursor-default">
                 Fix a bug
               </span>
-              <span class="px-3 py-1.5 text-xs bg-gray-800/80 text-gray-400 rounded-full border border-gray-700/50 hover:border-indigo-500/30 hover:text-gray-300 transition-all duration-200 cursor-default">
+              <span class="px-3 py-1.5 text-xs bg-gray-800/80 text-gray-400 rounded-full border border-gray-700/50 hover:border-violet-500/30 hover:text-gray-300 transition-all duration-200 cursor-default">
                 Add a feature
               </span>
             </div>
@@ -50,10 +50,10 @@ defmodule LoomWeb.ChatComponent do
 
             <% :assistant -> %>
               <div class="flex items-start gap-3 max-w-[85%]">
-                <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/30">
+                <div class="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-violet-500/30">
                   <span class="text-xs font-bold text-white">L</span>
                 </div>
-                <div class="border-l-2 border-indigo-500/40 pl-3 py-0.5">
+                <div class="border-l-2 border-violet-500/40 pl-3 py-0.5">
                   <div class="prose prose-invert prose-sm max-w-none chat-markdown">
                     {render_markdown(msg.content)}
                   </div>
@@ -86,26 +86,26 @@ defmodule LoomWeb.ChatComponent do
 
         <%!-- Thinking State --%>
         <div :if={@status == :thinking} class="flex items-start gap-3 max-w-[80%] animate-fade-in-up">
-          <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/30">
+          <div class="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-violet-500/30">
             <span class="text-xs font-bold text-white">L</span>
           </div>
-          <div class="bg-gray-800/60 rounded-xl px-4 py-3 shadow-sm shadow-indigo-500/5 border border-indigo-500/10">
+          <div class="bg-gray-800/60 rounded-xl px-4 py-3 shadow-sm shadow-violet-500/5 border border-violet-500/10">
             <div class="flex items-center gap-1.5">
-              <span class="thinking-dot w-2 h-2 bg-indigo-400 rounded-full"></span>
-              <span class="thinking-dot w-2 h-2 bg-indigo-400 rounded-full"></span>
-              <span class="thinking-dot w-2 h-2 bg-indigo-400 rounded-full"></span>
+              <span class="thinking-dot w-2 h-2 bg-violet-400 rounded-full"></span>
+              <span class="thinking-dot w-2 h-2 bg-violet-400 rounded-full"></span>
+              <span class="thinking-dot w-2 h-2 bg-violet-400 rounded-full"></span>
             </div>
           </div>
         </div>
 
         <%!-- Tool Executing State --%>
         <div :if={@current_tool} class="flex items-center gap-2 ml-10 animate-fade-in-up">
-          <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-800/40 rounded-lg border border-indigo-500/10 shadow-sm shadow-indigo-500/5">
-            <svg class="animate-spin h-3.5 w-3.5 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-800/40 rounded-lg border border-violet-500/10 shadow-sm shadow-violet-500/5">
+            <svg class="animate-spin h-3.5 w-3.5 text-violet-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
-            <span class="text-xs text-gray-400">Running <span class="text-indigo-400 font-medium">{@current_tool}</span></span>
+            <span class="text-xs text-gray-400">Running <span class="text-violet-400 font-medium">{@current_tool}</span></span>
           </div>
         </div>
       </div>
@@ -149,7 +149,7 @@ defmodule LoomWeb.ChatComponent do
 
   defp tool_card_header(msg) do
     case tool_type(msg) do
-      :file -> "bg-indigo-500/10 text-indigo-300"
+      :file -> "bg-violet-500/10 text-violet-300"
       :shell -> "bg-emerald-500/10 text-emerald-300"
       :search -> "bg-amber-500/10 text-amber-300"
       :decision -> "bg-purple-500/10 text-purple-300"
@@ -159,7 +159,7 @@ defmodule LoomWeb.ChatComponent do
 
   defp tool_card_border(msg) do
     case tool_type(msg) do
-      :file -> "border-indigo-500/20"
+      :file -> "border-violet-500/20"
       :shell -> "border-emerald-500/20"
       :search -> "border-amber-500/20"
       :decision -> "border-purple-500/20"

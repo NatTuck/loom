@@ -89,7 +89,7 @@ defmodule LoomWeb.TeamDashboardComponent do
       <%!-- Header --%>
       <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-sm font-semibold text-indigo-400">Team: {@team_id}</span>
+          <span class="text-sm font-semibold text-violet-400">Team: {@team_id}</span>
         </div>
         <span class="text-xs text-gray-500">{length(@agents)} agents</span>
       </div>
@@ -178,7 +178,7 @@ defmodule LoomWeb.TeamDashboardComponent do
   defp status_text_color(_), do: "text-gray-500"
 
   defp task_status_icon(:completed), do: Phoenix.HTML.raw(~s(<span class="text-green-400">&#10003;</span>))
-  defp task_status_icon(:in_progress), do: Phoenix.HTML.raw(~s(<span class="text-indigo-400 animate-spin inline-block">&#8635;</span>))
+  defp task_status_icon(:in_progress), do: Phoenix.HTML.raw(~s(<span class="text-violet-400 animate-spin inline-block">&#8635;</span>))
   defp task_status_icon(:assigned), do: Phoenix.HTML.raw(~s(<span class="text-blue-400">&#8635;</span>))
   defp task_status_icon(:pending), do: Phoenix.HTML.raw(~s(<span class="text-gray-500">&#9719;</span>))
   defp task_status_icon(:failed), do: Phoenix.HTML.raw(~s(<span class="text-red-400">&#10007;</span>))

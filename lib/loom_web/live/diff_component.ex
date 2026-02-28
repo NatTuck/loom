@@ -67,7 +67,7 @@ defmodule LoomWeb.DiffComponent do
               <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
               </svg>
-              <span class="text-indigo-400 truncate text-xs">{diff.file_path}</span>
+              <span class="text-violet-400 truncate text-xs">{diff.file_path}</span>
               <div class="ml-auto flex items-center gap-1.5">
                 <span :if={diff.additions > 0} class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium">+{diff.additions}</span>
                 <span :if={diff.deletions > 0} class="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 font-medium">-{diff.deletions}</span>
@@ -260,12 +260,12 @@ defmodule LoomWeb.DiffComponent do
     removed ++ added ++ context
   end
 
-  defp line_row_class(:hunk_header), do: "border-l-2 border-indigo-500/30"
+  defp line_row_class(:hunk_header), do: "border-l-2 border-violet-500/30"
   defp line_row_class(_), do: ""
 
   defp line_class(:add), do: "bg-emerald-500/10"
   defp line_class(:del), do: "bg-rose-500/10"
-  defp line_class(:hunk_header), do: "bg-indigo-900/10 text-indigo-400 text-[11px]"
+  defp line_class(:hunk_header), do: "bg-violet-900/10 text-violet-400 text-[11px]"
   defp line_class(:context), do: ""
 
   defp line_number_class(:add), do: "text-emerald-600 bg-emerald-500/5"

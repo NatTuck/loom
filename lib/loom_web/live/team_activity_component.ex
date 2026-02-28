@@ -15,7 +15,7 @@ defmodule LoomWeb.TeamActivityComponent do
   ]
 
   @type_config %{
-    tool_call: %{label: "tool", bg: "bg-indigo-400/20", text: "text-indigo-400"},
+    tool_call: %{label: "tool", bg: "bg-violet-400/20", text: "text-violet-400"},
     message: %{label: "message", bg: "bg-gray-400/20", text: "text-gray-400"},
     decision: %{label: "decision", bg: "bg-purple-400/20", text: "text-purple-400"},
     task_complete: %{label: "done", bg: "bg-green-400/20", text: "text-green-400"},
@@ -171,7 +171,7 @@ defmodule LoomWeb.TeamActivityComponent do
           phx-click="filter_agent"
           phx-value-agent=""
           phx-target={@myself}
-          class={"text-xs px-2 py-1 rounded font-medium transition #{if @agent_filter == nil, do: "bg-indigo-600 text-white", else: "bg-gray-800 text-gray-400 hover:text-gray-200"}"}
+          class={"text-xs px-2 py-1 rounded font-medium transition #{if @agent_filter == nil, do: "bg-violet-600 text-white", else: "bg-gray-800 text-gray-400 hover:text-gray-200"}"}
         >
           All
         </button>
@@ -240,7 +240,7 @@ defmodule LoomWeb.TeamActivityComponent do
                 phx-click="expand_event"
                 phx-value-id={event.id}
                 phx-target={@myself}
-                class="text-xs text-indigo-400 hover:text-indigo-300 mt-0.5"
+                class="text-xs text-violet-400 hover:text-violet-300 mt-0.5"
               >
                 show more
               </button>
