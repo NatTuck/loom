@@ -243,11 +243,6 @@ defmodule Loom.Teams.Agent do
         {:noreply, state}
 
       pending_info ->
-        tool_result =
-          if action in ["allow_once", "allow_always"],
-            do: "Approved",
-            else: "Error: Permission denied for #{tool_name}"
-
         if action == "allow_always" do
           Loom.Permissions.Manager.grant(to_string(tool_name), "*", state.team_id)
         end
@@ -257,6 +252,14 @@ defmodule Loom.Teams.Agent do
         messages = state.messages
 
         Task.Supervisor.start_child(Loom.Teams.TaskSupervisor, fn ->
+          tool_result =
+            if action in ["allow_once", "allow_always"] do
+              pd = pending_info.pending_data
+              AgentLoop.default_run_tool(pd.tool_module, pd.tool_args, pd.context)
+            else
+              "Error: Permission denied for #{tool_name}"
+            end
+
           result = AgentLoop.resume(tool_result, pending_info, messages)
           send(agent_pid, {:loop_resumed, result})
         end)
@@ -778,7 +781,9 @@ defmodule Loom.Teams.Agent do
 
   defp build_permission_callback(%{permission_mode: :auto}), do: nil
 
-  defp build_permission_callback(%{permission_mode: :session, team_id: team_id}) do
+  defp build_permission_callback(%{permission_mode: :session, team_id: team_id, name: name}) do
+    agent_name = name
+
     fn tool_name, tool_path ->
       case Loom.Permissions.Manager.check(to_string(tool_name), tool_path, team_id) do
         :allowed ->
@@ -788,7 +793,8 @@ defmodule Loom.Teams.Agent do
           Phoenix.PubSub.broadcast(
             Loom.PubSub,
             "team:#{team_id}",
-            {:permission_request, team_id, to_string(tool_name), tool_path}
+            {:permission_request, team_id, to_string(tool_name), tool_path,
+             {:agent, team_id, agent_name}}
           )
 
           {:pending, %{tool_name: to_string(tool_name), tool_path: tool_path}}

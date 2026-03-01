@@ -690,8 +690,16 @@ defmodule Loom.Session.Architect do
         :allowed
 
       :ask ->
-        # Broadcast permission request to UI and wait for response
-        broadcast(session_id, {:permission_request, session_id, tool_name, tool_path})
+        # Notify Session GenServer so it can forward the user's decision back
+        case Loom.Session.Manager.find_session(session_id) do
+          {:ok, session_pid} ->
+            send(session_pid, {:permission_pending, self(), tool_name, tool_path})
+
+          :error ->
+            :ok
+        end
+
+        broadcast(session_id, {:permission_request, session_id, tool_name, tool_path, :session})
 
         receive do
           {:permission_decision, action, ^tool_name, _tool_result} ->

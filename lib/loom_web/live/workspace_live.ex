@@ -162,7 +162,7 @@ defmodule LoomWeb.WorkspaceLive do
 
 
   def handle_event("permission_response", %{"action" => action, "tool_name" => tool_name, "tool_path" => tool_path}, socket) do
-    Session.permission_response(socket.assigns.session_id, action, tool_name, tool_path)
+    route_permission_response(socket, action, tool_name, tool_path)
     {:noreply, assign(socket, permission_request: nil)}
   end
 
@@ -170,7 +170,7 @@ defmodule LoomWeb.WorkspaceLive do
     # Fallback when tool_name/tool_path come from the assign
     case socket.assigns.permission_request do
       %{tool_name: tool_name, tool_path: tool_path} ->
-        Session.permission_response(socket.assigns.session_id, action, tool_name, tool_path)
+        route_permission_response(socket, action, tool_name, tool_path)
 
       _ ->
         :ok
@@ -260,8 +260,14 @@ defmodule LoomWeb.WorkspaceLive do
     {:noreply, socket}
   end
 
+  # 5-tuple with source tag (from architect :session or {:agent, team_id, name})
+  def handle_info({:permission_request, _id, tool_name, tool_path, source}, socket) do
+    {:noreply, assign(socket, permission_request: %{tool_name: tool_name, tool_path: tool_path, source: source})}
+  end
+
+  # 4-tuple backwards compat (default to :session source)
   def handle_info({:permission_request, _session_id, tool_name, tool_path}, socket) do
-    {:noreply, assign(socket, permission_request: %{tool_name: tool_name, tool_path: tool_path})}
+    {:noreply, assign(socket, permission_request: %{tool_name: tool_name, tool_path: tool_path, source: :session})}
   end
 
   def handle_info({:team_available, _session_id, team_id}, socket) do
@@ -353,8 +359,7 @@ defmodule LoomWeb.WorkspaceLive do
   end
 
   def handle_info({:permission_response, action, tool_name, tool_path}, socket) do
-    # Forward permission response to the Session GenServer
-    Session.permission_response(socket.assigns.session_id, action, tool_name, tool_path)
+    route_permission_response(socket, action, tool_name, tool_path)
     {:noreply, assign(socket, permission_request: nil)}
   end
 
@@ -799,6 +804,19 @@ defmodule LoomWeb.WorkspaceLive do
       session_id={@session_id}
     />
     """
+  end
+
+  defp route_permission_response(socket, action, tool_name, tool_path) do
+    case socket.assigns.permission_request do
+      %{source: {:agent, team_id, agent_name}} ->
+        case Loom.Teams.Manager.find_agent(team_id, agent_name) do
+          {:ok, pid} -> GenServer.cast(pid, {:permission_response, action, tool_name, tool_path})
+          :error -> :ok
+        end
+
+      _ ->
+        Session.permission_response(socket.assigns.session_id, action, tool_name, tool_path)
+    end
   end
 
   defp subscribe_to_team(team_id) do

@@ -252,6 +252,14 @@ defmodule Loom.Session do
     end
   end
 
+  # --- Permission pending from Architect Task ---
+
+  @impl true
+  def handle_info({:permission_pending, architect_pid, tool_name, tool_path}, state) do
+    Logger.debug("[Session] Permission pending: #{tool_name} #{tool_path}")
+    {:noreply, %{state | pending_permission: {architect_pid, %{tool_name: tool_name, tool_path: tool_path}}}}
+  end
+
   @impl true
   def handle_info(_msg, state) do
     {:noreply, state}

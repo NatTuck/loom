@@ -115,6 +115,11 @@ defmodule Loom.Teams.Manager do
       model: opts[:model]
     ]
 
+    child_opts =
+      if opts[:permission_mode],
+        do: Keyword.put(child_opts, :permission_mode, opts[:permission_mode]),
+        else: child_opts
+
     Distributed.start_child({Loom.Teams.Agent, child_opts})
   end
 
