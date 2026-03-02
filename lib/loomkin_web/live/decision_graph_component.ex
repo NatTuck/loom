@@ -53,6 +53,9 @@ defmodule LoomkinWeb.DecisionGraphComponent do
     {:revisit, "Revisit"}
   ]
 
+  # Pulse cache TTL in seconds
+  @pulse_ttl_seconds 30
+
   @impl true
   def mount(socket) do
     {:ok,
@@ -61,6 +64,8 @@ defmodule LoomkinWeb.DecisionGraphComponent do
        edges: [],
        positioned: [],
        pulse: nil,
+       pulse_data: nil,
+       pulse_generated_at: nil,
        selected_node: nil,
        agent_filter: nil,
        svg_width: 800,
@@ -74,7 +79,7 @@ defmodule LoomkinWeb.DecisionGraphComponent do
     session_id = assigns[:session_id]
     team_id = assigns[:team_id]
 
-    {nodes, edges, pulse} = load_graph_data(session_id, team_id)
+    {nodes, edges, pulse} = load_graph_data(session_id, team_id, socket)
     node_ids = MapSet.new(nodes, & &1.id)
 
     # Filter edges to only those connecting our nodes
@@ -103,17 +108,21 @@ defmodule LoomkinWeb.DecisionGraphComponent do
     positioned = layout_nodes(visible_nodes)
     {svg_w, svg_h} = compute_svg_dimensions(positioned)
 
+    pulse_assigns = [pulse_data: pulse, pulse_generated_at: System.monotonic_time(:second)]
+
     {:ok,
-     assign(socket,
-       nodes: nodes,
-       edges: relevant_edges,
-       positioned: positioned,
-       pulse: pulse,
-       agents: agents,
-       conflict_ids: conflict_ids,
-       visible_edges: visible_edges,
-       svg_width: max(svg_w, 400),
-       svg_height: max(svg_h, 200)
+     assign(
+       socket,
+       [{:nodes, nodes},
+        {:edges, relevant_edges},
+        {:positioned, positioned},
+        {:pulse, pulse},
+        {:agents, agents},
+        {:conflict_ids, conflict_ids},
+        {:visible_edges, visible_edges},
+        {:svg_width, max(svg_w, 400)},
+        {:svg_height, max(svg_h, 200)}
+        | pulse_assigns]
      )}
   end
 
@@ -720,9 +729,9 @@ defmodule LoomkinWeb.DecisionGraphComponent do
     "#{goals} active goals, #{decisions} recent decisions, #{gaps} coverage gaps"
   end
 
-  defp load_graph_data(nil, nil), do: {[], [], nil}
+  defp load_graph_data(nil, nil, _socket), do: {[], [], nil}
 
-  defp load_graph_data(session_id, team_id) do
+  defp load_graph_data(session_id, team_id, socket) do
     try do
       session_nodes =
         if is_binary(session_id) do
@@ -740,10 +749,22 @@ defmodule LoomkinWeb.DecisionGraphComponent do
 
       nodes = Enum.uniq_by(session_nodes ++ team_nodes, & &1.id)
       edges = Graph.list_edges([])
-      pulse = Pulse.generate()
+      pulse = maybe_generate_pulse(socket)
       {nodes, edges, pulse}
     rescue
       _ -> {[], [], nil}
+    end
+  end
+
+  defp maybe_generate_pulse(socket) do
+    cached = socket.assigns[:pulse_data]
+    generated_at = socket.assigns[:pulse_generated_at]
+    now = System.monotonic_time(:second)
+
+    if is_nil(cached) or is_nil(generated_at) or now - generated_at >= @pulse_ttl_seconds do
+      Pulse.generate()
+    else
+      cached
     end
   end
 end

@@ -54,6 +54,18 @@ config :logger, :console,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
 
+# ReqLLM streaming configuration — extend timeouts for long LLM responses
+config :req_llm,
+  receive_timeout: 120_000,
+  stream_receive_timeout: 120_000,
+  finch: [
+    name: ReqLLM.Finch,
+    pools: %{
+      :default => [protocols: [:http1], size: 1, count: 8,
+                   conn_opts: [transport_opts: [timeout: 120_000]]]
+    }
+  ]
+
 # Use Jason for JSON parsing
 config :phoenix, :json_library, Jason
 

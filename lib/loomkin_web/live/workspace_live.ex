@@ -38,6 +38,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         activity_events: [],
         activity_known_agents: [],
         # Mission control assigns
+        roster_version: 0,
         mode: :mission_control,
         focused_agent: nil,
         inspector_mode: :auto_follow,
@@ -407,6 +408,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         socket.assigns.child_teams ++ [child_team_id]
       end
 
+    socket = update(socket, :roster_version, &((&1 || 0) + 1))
     {:noreply, assign(socket, child_teams: child_teams, mode: :mission_control)}
   end
 
@@ -510,6 +512,7 @@ defmodule LoomkinWeb.WorkspaceLive do
   # Team PubSub events -- forward to team components via send_update
   def handle_info({:agent_status, _agent_name, _status} = event, socket) do
     forward_to_team_components(socket)
+    socket = update(socket, :roster_version, &((&1 || 0) + 1))
     {:noreply, forward_to_activity(socket, event)}
   end
 
@@ -536,6 +539,7 @@ defmodule LoomkinWeb.WorkspaceLive do
 
   def handle_info({:role_changed, _agent_name, _old, _new} = event, socket) do
     forward_to_dashboard(socket)
+    socket = update(socket, :roster_version, &((&1 || 0) + 1))
     {:noreply, forward_to_activity(socket, event)}
   end
 
@@ -631,6 +635,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         socket.assigns.child_teams ++ [child_team_id]
       end
 
+    socket = update(socket, :roster_version, &((&1 || 0) + 1))
     {:noreply, assign(socket, :child_teams, child_teams)}
   end
 
@@ -659,6 +664,8 @@ defmodule LoomkinWeb.WorkspaceLive do
         if child_teams == [] && socket.assigns.team_id == nil,
           do: :solo,
           else: socket.assigns.mode
+
+      socket = update(socket, :roster_version, &((&1 || 0) + 1))
 
       {:noreply,
        assign(socket, child_teams: child_teams, active_team_id: active_team_id, mode: mode)}
@@ -1000,6 +1007,7 @@ defmodule LoomkinWeb.WorkspaceLive do
       tasks={roster_tasks(@active_team_id)}
       budget={roster_budget(@active_team_id)}
       focused_agent={@focused_agent}
+      roster_version={@roster_version}
     />
 
     <%!-- Center: Activity Feed (flex-1) + Input Bar --%>
@@ -1743,11 +1751,27 @@ defmodule LoomkinWeb.WorkspaceLive do
   defp roster_agents(nil), do: []
 
   defp roster_agents(team_id) do
-    case Loomkin.Teams.Manager.list_agents(team_id) do
-      agents when is_list(agents) -> agents
-      {:ok, agents} when is_list(agents) -> agents
-      _other -> []
-    end
+    parent_agents =
+      case Loomkin.Teams.Manager.list_agents(team_id) do
+        agents when is_list(agents) -> agents
+        {:ok, agents} when is_list(agents) -> agents
+        _other -> []
+      end
+      |> Enum.map(&Map.put(&1, :team_id, team_id))
+
+    child_agents =
+      team_id
+      |> Loomkin.Teams.Manager.list_sub_teams()
+      |> Enum.flat_map(fn child_id ->
+        case Loomkin.Teams.Manager.list_agents(child_id) do
+          agents when is_list(agents) -> agents
+          {:ok, agents} when is_list(agents) -> agents
+          _other -> []
+        end
+        |> Enum.map(&Map.put(&1, :team_id, child_id))
+      end)
+
+    parent_agents ++ child_agents
   end
 
   defp roster_agent_count(team_id), do: team_id |> roster_agents() |> length()

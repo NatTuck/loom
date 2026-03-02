@@ -87,39 +87,47 @@ defmodule Loomkin.Decisions.AutoLogger do
   def handle_info({:task_completed, task_id, owner, _result}, state) do
     title = task_title(task_id)
 
-    {:ok, node} =
-      log_node(state, %{
-        node_type: :outcome,
-        title: "Completed: #{title}",
-        agent_name: to_string(owner),
-        metadata: base_metadata(state, %{"task_id" => task_id})
-      })
+    case log_node(state, %{
+           node_type: :outcome,
+           title: "Completed: #{title}",
+           agent_name: to_string(owner),
+           metadata: base_metadata(state, %{"task_id" => task_id})
+         }) do
+      {:ok, node} ->
+        # Edge from task action node → outcome
+        if parent_id = state.task_nodes[task_id] do
+          Graph.add_edge(parent_id, node.id, :leads_to)
+        end
 
-    # Edge from task action node → outcome
-    if parent_id = state.task_nodes[task_id] do
-      Graph.add_edge(parent_id, node.id, :leads_to)
+        {:noreply, state}
+
+      {:error, reason} ->
+        Logger.warning("[AutoLogger] Failed to log task_completed node: #{inspect(reason)}")
+        {:noreply, state}
     end
-
-    {:noreply, state}
   end
 
   # Task failed
   def handle_info({:task_failed, task_id, owner, reason}, state) do
     title = task_title(task_id)
 
-    {:ok, node} =
-      log_node(state, %{
-        node_type: :outcome,
-        title: "Failed: #{title} — #{truncate(inspect(reason), 120)}",
-        agent_name: to_string(owner),
-        metadata: base_metadata(state, %{"task_id" => task_id})
-      })
+    case log_node(state, %{
+           node_type: :outcome,
+           title: "Failed: #{title} — #{truncate(inspect(reason), 120)}",
+           agent_name: to_string(owner),
+           metadata: base_metadata(state, %{"task_id" => task_id})
+         }) do
+      {:ok, node} ->
+        if parent_id = state.task_nodes[task_id] do
+          Graph.add_edge(parent_id, node.id, :leads_to)
+        end
 
-    if parent_id = state.task_nodes[task_id] do
-      Graph.add_edge(parent_id, node.id, :leads_to)
+        {:noreply, state}
+
+      {:error, reason} ->
+        Logger.warning("[AutoLogger] Failed to log task_failed node: #{inspect(reason)}")
+        {:noreply, state}
     end
-
-    {:noreply, state}
   end
 
   # Keeper created (context offloaded)

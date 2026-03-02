@@ -66,11 +66,14 @@ defmodule Loomkin.LLMRetry do
 
       is_struct(reason) ->
         status = Map.get(reason, :status)
-        message = Map.get(reason, :reason) || Map.get(reason, :message) || ""
+        reason_field = Map.get(reason, :reason)
+        message = reason_field || Map.get(reason, :message) || ""
 
         cond do
           status in [429, 500, 502, 503, 504, 529] -> true
           status in [400, 401, 403, 404] -> false
+          is_atom(reason_field) ->
+            reason_field in [:timeout, :closed, :econnrefused, :econnreset, :econnaborted, :ehostunreach]
           is_binary(message) -> transient_string?(message)
           true -> false
         end
