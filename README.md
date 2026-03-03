@@ -65,18 +65,10 @@ cd loomkin
 # Install deps and set up the database
 mix setup
 
-# Build a release (includes native extensions + priv assets)
-MIX_ENV=prod mix release loomkin
-# → _build/prod/rel/loomkin/bin/loom start
-
-# Start the web UI (optional)
+# Start the web UI
 mix phx.server
 # → http://localhost:4200
 ```
-
-> **Note:** `mix escript.build` is available for development but the escript cannot
-> bundle NIFs (exqlite) or priv directories (tzdata). Use `mix release` for a
-> runnable binary. See [docs/building-binaries.md](docs/building-binaries.md).
 
 ### Configure
 
@@ -107,18 +99,6 @@ auto_approve = ["file_read", "file_search", "content_search", "directory_list"]
 # Web UI — streaming chat, file tree, decision graph, team dashboard
 mix phx.server
 # → http://localhost:4200
-
-# Interactive CLI — open a REPL in your project
-./loomkin --project /path/to/your/project
-
-# One-shot mode — ask a single question
-./loomkin --project . "What does the auth module do?"
-
-# Specify a model
-./loomkin --model anthropic:claude-sonnet-4-6 --project .
-
-# Resume a previous session
-./loomkin --resume <session-id> --project .
 ```
 
 ---
@@ -145,7 +125,6 @@ mix phx.server
 
 ### Interfaces
 
-- **Interactive CLI** — REPL with streaming output, colored diffs, markdown rendering
 - **Phoenix LiveView web UI** — 13 components, zero JavaScript: streaming chat, file tree, unified diffs, interactive SVG decision graph, model selector, session switcher, tool approval modals, terminal viewer, team dashboard, team activity feed, team cost tracker, cost analytics dashboard
 - **MCP server + client** — expose Loomkin's tools to VS Code/Cursor/Zed; consume external tools from Tidewave, HexDocs, and any MCP server. Bidirectional by default
 - **Architect/Editor mode** — strong model (e.g. Opus) plans edits, fast model (e.g. Haiku) executes them. Can spawn full teams for complex tasks instead of file-based plans. 918 LOC of two-model orchestration
@@ -160,7 +139,6 @@ mix phx.server
 - **Permission system** — per-tool, per-path approval with session-scoped grants
 - **LLM retry** — exponential backoff with transient vs permanent error classification
 - **Hot code reloading** — update tools, add providers, tweak prompts without restarting sessions
-- **Single binary** — [Burrito](https://github.com/burrito-elixir/burrito) wraps the BEAM for macOS + Linux ([build instructions](docs/building-binaries.md))
 - **Telemetry + cost dashboard** — per-session costs, model usage breakdown, tool execution frequency at `/dashboard`
 
 ---
@@ -170,10 +148,10 @@ mix phx.server
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                      INTERFACES                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│  │   CLI (Owl)   │  │ LiveView Web │  │ Headless API │   │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘   │
-│         └─────────────────┼─────────────────┘            │
+│  ┌──────────────┐  ┌──────────────┐                      │
+│  │ LiveView Web  │  │ Headless API │                      │
+│  └──────┬───────┘  └──────┬───────┘                      │
+│         └─────────────────┘                              │
 ├───────────────────────────┼──────────────────────────────┤
 │  Session Layer            │                              │
 │  ┌────────────────────────┴───────────────────────────┐  │
@@ -199,20 +177,6 @@ mix phx.server
 ```
 
 [Full architecture deep dive — decision graph, Jido foundation, project structure](docs/architecture.md)
-
----
-
-## CLI Commands
-
-| Command | Description |
-|---------|-------------|
-| `/help` | Show available commands |
-| `/model <name>` | Switch LLM model mid-session |
-| `/architect` | Toggle architect/editor two-model mode |
-| `/history` | Show conversation history |
-| `/sessions` | List all saved sessions |
-| `/clear` | Clear conversation history |
-| `/quit` | Exit Loomkin |
 
 ---
 
