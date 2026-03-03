@@ -40,6 +40,11 @@ defmodule LoomkinWeb.AgentRosterComponent do
     {:noreply, socket}
   end
 
+  def handle_event("reply_agent", %{"agent" => agent_name, "team-id" => team_id}, socket) do
+    send(self(), {:reply_to_agent, agent_name, team_id})
+    {:noreply, socket}
+  end
+
   def handle_event("toggle_tasks", _params, socket) do
     {:noreply, assign(socket, tasks_collapsed: !socket.assigns.tasks_collapsed)}
   end
@@ -72,14 +77,14 @@ defmodule LoomkinWeb.AgentRosterComponent do
         </div>
 
         <div class="space-y-0.5 px-1.5">
-          <button
+          <div
             :for={agent <- @agents}
             phx-click="focus_agent"
             phx-value-agent={agent.name}
             phx-target={@myself}
             class={"w-full text-left px-2 py-2 rounded-md transition cursor-pointer hover:bg-gray-900 #{if @focused_agent == agent.name, do: "bg-gray-900 border border-violet-500/50", else: "border border-transparent"}"}
           >
-            <%!-- Row 1: status dot + name + role badge --%>
+            <%!-- Row 1: status dot + name + role badge + reply button --%>
             <div class="flex items-center gap-2">
               <span class={"w-2 h-2 rounded-full flex-shrink-0 #{status_dot_class(agent.status)}"}>
               </span>
@@ -92,6 +97,22 @@ defmodule LoomkinWeb.AgentRosterComponent do
               <span class="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded font-medium">
                 {format_role(agent.role)}
               </span>
+              <button
+                phx-click="reply_agent"
+                phx-value-agent={agent.name}
+                phx-value-team-id={agent.team_id}
+                phx-target={@myself}
+                title={"Reply to #{agent.name}"}
+                class="text-gray-600 hover:text-emerald-400 transition p-0.5 rounded hover:bg-gray-800/50 flex-shrink-0"
+              >
+                <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fill-rule="evenodd"
+                    d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
             </div>
             <%!-- Row 2: current task --%>
             <div class="mt-0.5 pl-4">
@@ -99,7 +120,7 @@ defmodule LoomkinWeb.AgentRosterComponent do
                 {Map.get(agent, :current_task) || status_label(agent.status)}
               </span>
             </div>
-          </button>
+          </div>
         </div>
       </div>
 

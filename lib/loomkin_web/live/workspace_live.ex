@@ -149,39 +149,44 @@ defmodule LoomkinWeb.WorkspaceLive do
 
     case socket.assigns.reply_target do
       %{agent: agent_name, team_id: team_id} ->
-        # Direct reply to a specific agent
-        Task.start(fn ->
-          case Loomkin.Teams.Manager.find_agent(team_id, agent_name) do
-            {:ok, pid} -> Loomkin.Teams.Agent.send_message(pid, trimmed)
-            _ -> :ok
-          end
-        end)
+        # Direct reply to a specific agent — validate agent still exists
+        case Loomkin.Teams.Manager.find_agent(team_id, agent_name) do
+          {:ok, pid} ->
+            Task.start(fn -> Loomkin.Teams.Agent.send_message(pid, trimmed) end)
 
-        reply_event = %{
-          id: Ecto.UUID.generate(),
-          type: :message,
-          agent: "You",
-          content: trimmed,
-          timestamp: DateTime.utc_now(),
-          expanded: false,
-          metadata: %{from: "You", to: agent_name}
-        }
+            reply_event = %{
+              id: Ecto.UUID.generate(),
+              type: :message,
+              agent: "You",
+              content: trimmed,
+              timestamp: DateTime.utc_now(),
+              expanded: false,
+              metadata: %{from: "You", to: agent_name}
+            }
 
-        events = socket.assigns.activity_events ++ [reply_event]
+            events = socket.assigns.activity_events ++ [reply_event]
 
-        events =
-          if length(events) > @max_activity_events,
-            do: Enum.drop(events, length(events) - @max_activity_events),
-            else: events
+            events =
+              if length(events) > @max_activity_events,
+                do: Enum.drop(events, length(events) - @max_activity_events),
+                else: events
 
-        {:noreply,
-         socket
-         |> assign(
-           input_text: "",
-           reply_target: nil,
-           activity_events: events
-         )
-         |> push_event("clear-input", %{})}
+            {:noreply,
+             socket
+             |> assign(
+               input_text: "",
+               reply_target: nil,
+               activity_events: events
+             )
+             |> push_event("clear-input", %{})}
+
+          _ ->
+            {:noreply,
+             socket
+             |> assign(reply_target: nil)
+             |> put_flash(:warning, "Agent #{agent_name} is no longer available")
+             |> push_event("clear-input", %{})}
+        end
 
       nil ->
         # Normal flow: send through Architect pipeline
@@ -236,9 +241,9 @@ defmodule LoomkinWeb.WorkspaceLive do
   end
 
   def handle_event("reply_to_agent", %{"agent" => agent_name}, socket) do
-    # Find the agent's team_id from the roster data
-    agents = roster_agents(socket.assigns.team_id)
-    team_id = Enum.find_value(agents, socket.assigns.team_id, fn a ->
+    # Find the agent's team_id from the roster data (use active_team_id for sub-team support)
+    agents = roster_agents(socket.assigns.active_team_id)
+    team_id = Enum.find_value(agents, socket.assigns.active_team_id, fn a ->
       if a.name == agent_name, do: a.team_id
     end)
 
@@ -298,7 +303,7 @@ defmodule LoomkinWeb.WorkspaceLive do
 
   def handle_event("switch_team", %{"team-id" => team_id}, socket) do
     bindings = load_channel_bindings(team_id)
-    {:noreply, assign(socket, active_team_id: team_id, channel_bindings: bindings)}
+    {:noreply, assign(socket, active_team_id: team_id, channel_bindings: bindings, reply_target: nil)}
   end
 
   def handle_event("edit_explorer_path", _params, socket) do
@@ -543,6 +548,18 @@ defmodule LoomkinWeb.WorkspaceLive do
     else
       {:noreply, socket}
     end
+  end
+
+  # --- Component Info Messages ---
+
+  def handle_info({:reply_to_agent, agent_name}, socket) do
+    # Forwarded from roster component — same logic as the event handler
+    agents = roster_agents(socket.assigns.active_team_id)
+    team_id = Enum.find_value(agents, socket.assigns.active_team_id, fn a ->
+      if a.name == agent_name, do: a.team_id
+    end)
+
+    {:noreply, assign(socket, reply_target: %{agent: agent_name, team_id: team_id})}
   end
 
   # --- PubSub Info ---
@@ -1041,6 +1058,11 @@ defmodule LoomkinWeb.WorkspaceLive do
   # Messages from AgentRosterComponent
   def handle_info({:focus_agent, agent_name}, socket) do
     {:noreply, assign(socket, focused_agent: agent_name, inspector_mode: :pinned)}
+  end
+
+  # Forwarded from AgentRosterComponent reply button
+  def handle_info({:reply_to_agent, agent_name, team_id}, socket) do
+    {:noreply, assign(socket, reply_target: %{agent: agent_name, team_id: team_id})}
   end
 
   def handle_info({:unpin_agent}, socket) do
