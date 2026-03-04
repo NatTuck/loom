@@ -93,6 +93,41 @@ defmodule Loomkin.Teams.ContextKeeper do
     GenServer.call(pid, :flush_persist)
   end
 
+  @doc "Rehydrate all keepers for a team from the database."
+  def rehydrate_from_db(team_id) do
+    import Ecto.Query
+
+    keepers =
+      Loomkin.Schemas.ContextKeeper
+      |> where([k], k.team_id == ^team_id and k.status == :active)
+      |> Repo.all()
+
+    Enum.each(keepers, fn record ->
+      # Skip if already running
+      case Registry.lookup(Loomkin.Teams.AgentRegistry, {team_id, "keeper:#{record.id}"}) do
+        [{_pid, _}] ->
+          :ok
+
+        [] ->
+          opts = [
+            id: record.id,
+            team_id: team_id,
+            topic: record.topic,
+            source_agent: record.source_agent
+          ]
+
+          DynamicSupervisor.start_child(
+            Loomkin.Teams.KeeperSupervisor,
+            {__MODULE__, opts}
+          )
+      end
+    end)
+  rescue
+    e ->
+      Logger.warning("[ContextKeeper] rehydrate_from_db failed: #{Exception.message(e)}")
+      :ok
+  end
+
   # --- Callbacks ---
 
   @impl true

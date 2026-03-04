@@ -125,7 +125,9 @@ defmodule Loomkin.Teams.AgentProjectPathTest do
   describe "Manager.list_all_agents/1" do
     test "includes agents from sub-teams" do
       parent_id = create_team(project_path: "/tmp/test")
-      {:ok, child_id} = Manager.create_sub_team(parent_id, "test", name: "child-team", project_path: "/tmp/test")
+
+      {:ok, child_id} =
+        Manager.create_sub_team(parent_id, "test", name: "child-team", project_path: "/tmp/test")
 
       start_agent_in_team(parent_id, name: "parent-agent")
       start_agent_in_team(child_id, name: "child-agent")

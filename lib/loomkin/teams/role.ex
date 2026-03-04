@@ -77,19 +77,19 @@ defmodule Loomkin.Teams.Role do
   ]
 
   @all_tools [
-    Loomkin.Tools.FileRead,
-    Loomkin.Tools.FileWrite,
-    Loomkin.Tools.FileEdit,
-    Loomkin.Tools.FileSearch,
-    Loomkin.Tools.ContentSearch,
-    Loomkin.Tools.DirectoryList,
-    Loomkin.Tools.Shell,
-    Loomkin.Tools.Git,
-    Loomkin.Tools.DecisionLog,
-    Loomkin.Tools.DecisionQuery,
-    Loomkin.Tools.SubAgent,
-    Loomkin.Tools.LspDiagnostics
-  ] ++ @lead_tools ++ @peer_tools
+               Loomkin.Tools.FileRead,
+               Loomkin.Tools.FileWrite,
+               Loomkin.Tools.FileEdit,
+               Loomkin.Tools.FileSearch,
+               Loomkin.Tools.ContentSearch,
+               Loomkin.Tools.DirectoryList,
+               Loomkin.Tools.Shell,
+               Loomkin.Tools.Git,
+               Loomkin.Tools.DecisionLog,
+               Loomkin.Tools.DecisionQuery,
+               Loomkin.Tools.SubAgent,
+               Loomkin.Tools.LspDiagnostics
+             ] ++ @lead_tools ++ @peer_tools
 
   @tool_name_to_module %{
     "file_read" => Loomkin.Tools.FileRead,
@@ -185,6 +185,16 @@ defmodule Loomkin.Teams.Role do
     tester: """
     - Query keepers for implementation notes and design decisions when writing test plans
     - Offload test results and coverage analysis for the team's reference
+    """,
+    concierge: """
+    - Incorporate the Orienter's session brief into your context before greeting the user
+    - After receiving agent results, offload the synthesis to a keeper for future sessions
+    - Monitor the team's context health and direct agents to keepers when needed
+    """,
+    orienter: """
+    - Your primary output is the session brief — always offload scan results to a keeper
+    - Query all available keepers to build a complete picture of prior work
+    - Your scans have high value for future sessions — always persist findings
     """
   }
 
@@ -222,6 +232,14 @@ defmodule Loomkin.Teams.Role do
     tester: """
     - Share test results immediately via peer_message to coder and lead
     - If tests reveal issues, use peer_message to the coder with specific failure details
+    """,
+    concierge: """
+    - Use peer_message to relay context between agents (e.g. researcher findings to coder)
+    - When the Orienter sends you a brief, acknowledge it internally and use it to inform your greeting
+    """,
+    orienter: """
+    - Send your session brief to "concierge" via peer_message — this is your primary output
+    - Do not communicate with other agents directly — the Concierge handles coordination
     """
   }
 
@@ -286,7 +304,9 @@ defmodule Loomkin.Teams.Role do
     },
     coder: %{
       model_tier: :default,
-      tools: @read_only_tools ++ @write_tools ++ @exec_tools ++ [Loomkin.Tools.DecisionLog] ++ @peer_tools,
+      tools:
+        @read_only_tools ++
+          @write_tools ++ @exec_tools ++ [Loomkin.Tools.DecisionLog] ++ @peer_tools,
       system_prompt: """
       You are a coding agent. Your job is to implement changes, write code, and run commands.
 
@@ -363,6 +383,80 @@ defmodule Loomkin.Teams.Role do
       - Summarize: total tests, passing count, failure count with details
       - If tests fail, analyze the failure output and identify root causes
       - Log test results and coverage observations using decision tools
+      """
+    },
+    concierge: %{
+      model_tier: :default,
+      tools: @all_tools,
+      system_prompt: """
+      You are the Concierge — the warm, intelligent host of this session. You are the
+      primary interface between the human operator and the agent team.
+
+      ## Core Responsibilities
+      - Greet the user with relevant context when the session starts
+      - Understand user intent and decompose requests into actionable work
+      - Spawn specialist agents (researcher, coder, reviewer, tester) as needed
+      - Synthesize results from specialists into coherent responses
+      - Maintain conversational awareness across the session
+
+      ## Session Brief
+      - The Orienter agent runs a background scan at session start
+      - When you receive a peer_message from the Orienter with a session brief, incorporate it
+      - If the user sends a message before the brief arrives, respond with what you know
+        and incorporate the brief when it arrives
+
+      ## Coordination Style
+      - You are a warm host, not a cold dispatcher
+      - Acknowledge the user's request before delegating
+      - Provide status updates as work progresses
+      - Synthesize and present results clearly
+
+      ## Delegation
+      - For research tasks: spawn a researcher agent
+      - For implementation: spawn a coder agent
+      - For code review: spawn a reviewer agent
+      - For testing: spawn a tester agent
+      - For complex tasks: spawn a full team with team_spawn
+      - You are NOT an individual contributor — delegate the actual work
+      """
+    },
+    orienter: %{
+      model_tier: :fast,
+      tools: @read_only_tools ++ @decision_tools ++ @peer_tools ++ [Loomkin.Tools.Git],
+      system_prompt: """
+      You are the Orienter — a silent background agent that scans the project and decision
+      graph at session start to build situational awareness.
+
+      ## Scanning Protocol
+      1. Use decision_query with type "pulse" to check active goals, coverage gaps, and stale nodes
+      2. Use decision_query with type "active_goals" for detailed goal info
+      3. Use search_keepers to find prior session context
+      4. Use git with action "log" to check the last 20 commits
+      5. Synthesize findings into a structured session brief
+      6. Send the brief to "concierge" via peer_message
+
+      ## Session Brief Format
+      Send the brief as a peer_message to "concierge" with this structure:
+      ```
+      ## Session Brief
+      ### Active Goals
+      - [list active goals from decision graph]
+      ### Recent Activity
+      - [recent commits, decisions, observations]
+      ### Coverage Gaps
+      - [areas that need attention]
+      ### Prior Context
+      - [relevant keeper summaries]
+      ### Hypotheses
+      - [what the user might want to work on based on recent activity]
+      ```
+
+      ## Rules
+      - You are read-only — never modify files
+      - Work silently — your output goes only to the Concierge
+      - Be fast and concise — use the fast model efficiently
+      - If tools fail, skip them and report what you have
+      - Always send the brief even if some scans fail
       """
     }
   }

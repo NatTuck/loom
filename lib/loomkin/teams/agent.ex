@@ -10,7 +10,18 @@ defmodule Loomkin.Teams.Agent do
   use GenServer
 
   alias Loomkin.AgentLoop
-  alias Loomkin.Teams.{Comms, Context, ContextRetrieval, CostTracker, Manager, ModelRouter, PriorityRouter, RateLimiter, Role}
+
+  alias Loomkin.Teams.{
+    Comms,
+    Context,
+    ContextRetrieval,
+    CostTracker,
+    Manager,
+    ModelRouter,
+    PriorityRouter,
+    RateLimiter,
+    Role
+  }
 
   require Logger
 
@@ -119,11 +130,42 @@ defmodule Loomkin.Teams.Agent do
         Context.register_agent(team_id, name, %{role: role, status: :idle, model: model})
         broadcast_team(state, {:agent_status, state.name, :idle})
 
-        {:ok, state}
+        if role == :orienter do
+          {:ok, state, {:continue, :auto_orient}}
+        else
+          {:ok, state}
+        end
 
       {:error, :unknown_role} ->
         {:stop, {:unknown_role, role}}
     end
+  end
+
+  @impl true
+  def handle_continue(:auto_orient, state) do
+    state = set_status(state, :working)
+    broadcast_team(state, {:agent_status, state.name, :working})
+
+    orientation_prompt = """
+    Begin your orientation scan now. Follow your scanning protocol:
+    1. Use decision_query with type "pulse" to check active goals, coverage gaps, and stale nodes
+    2. Use decision_query with type "active_goals" for detailed goal info
+    3. Use search_keepers to find prior session context
+    4. Use git with action "log" to check the last 20 commits
+    5. Synthesize findings into a structured session brief
+    6. Send the brief to "concierge" via peer_message
+    """
+
+    messages = [%{role: :user, content: orientation_prompt}]
+    loop_opts = build_loop_opts(state)
+    snapshot = build_snapshot(state)
+
+    task =
+      Task.Supervisor.async_nolink(Loomkin.Teams.TaskSupervisor, fn ->
+        run_loop_with_escalation(messages, loop_opts, snapshot)
+      end)
+
+    {:noreply, %{state | loop_task: {task, nil}, messages: messages}}
   end
 
   # --- handle_call ---
@@ -145,9 +187,10 @@ defmodule Loomkin.Teams.Agent do
     loop_opts = build_loop_opts(state)
     snapshot = build_snapshot(state)
 
-    task = Task.Supervisor.async_nolink(Loomkin.Teams.TaskSupervisor, fn ->
-      run_loop_with_escalation(messages, loop_opts, snapshot)
-    end)
+    task =
+      Task.Supervisor.async_nolink(Loomkin.Teams.TaskSupervisor, fn ->
+        run_loop_with_escalation(messages, loop_opts, snapshot)
+      end)
 
     {:noreply, %{state | loop_task: {task, from}}}
   end
@@ -172,7 +215,11 @@ defmodule Loomkin.Teams.Agent do
     if opts[:require_approval] do
       # Send approval request to lead and wait synchronously
       request_id = Ecto.UUID.generate()
-      Comms.broadcast(state.team_id, {:role_change_request, state.name, state.role, new_role, request_id})
+
+      Comms.broadcast(
+        state.team_id,
+        {:role_change_request, state.name, state.role, new_role, request_id}
+      )
 
       # For now, pending approval proceeds immediately — the lead can reject via PubSub
       # A full interactive approval flow would require async state, which we avoid here.
@@ -191,7 +238,15 @@ defmodule Loomkin.Teams.Agent do
         task_id = state.task && state.task[:id]
         if original_from, do: GenServer.reply(original_from, {:error, :cancelled})
         if !original_from && task_id, do: Loomkin.Teams.Tasks.fail_task(task_id, "cancelled")
-        state = %{state | loop_task: nil, pending_permission: nil, pending_updates: [], priority_queue: []}
+
+        state = %{
+          state
+          | loop_task: nil,
+            pending_permission: nil,
+            pending_updates: [],
+            priority_queue: []
+        }
+
         state = set_status(state, :idle)
         broadcast_team(state, {:agent_status, state.name, :idle})
         {:reply, :ok, state}
@@ -282,7 +337,9 @@ defmodule Loomkin.Teams.Agent do
     case state.loop_task do
       {%Task{ref: ^ref}, from} ->
         task_id = state.task && state.task[:id]
-        if task_id, do: ModelRouter.record_success(state.team_id, state.name, task_id, state.model)
+
+        if task_id,
+          do: ModelRouter.record_success(state.team_id, state.name, task_id, state.model)
 
         state = %{state | messages: msgs, failure_count: 0, loop_task: nil}
         state = track_usage(state, meta)
@@ -441,7 +498,8 @@ defmodule Loomkin.Teams.Agent do
     else
       keeper_msg = %{
         role: :system,
-        content: "New keeper available: [#{info.id}] \"#{info.topic}\" by #{info.source} (#{info.tokens} tokens)"
+        content:
+          "New keeper available: [#{info.id}] \"#{info.topic}\" by #{info.source} (#{info.tokens} tokens)"
       }
 
       {:noreply, %{state | messages: state.messages ++ [keeper_msg]}}
@@ -463,8 +521,16 @@ defmodule Loomkin.Teams.Agent do
         {:ok, task} ->
           # Only override model if the task has an explicit model_hint;
           # otherwise preserve the agent's current model (set at spawn from user's selection)
-          task_map = %{id: task.id, description: task.description, title: task.title, model_hint: task.model_hint}
-          model = if task.model_hint, do: ModelRouter.select(state.role, task_map), else: state.model
+          task_map = %{
+            id: task.id,
+            description: task.description,
+            title: task.title,
+            model_hint: task.model_hint
+          }
+
+          model =
+            if task.model_hint, do: ModelRouter.select(state.role, task_map), else: state.model
+
           state = %{state | task: task_map, model: model}
           messages = maybe_prefetch_context(state, state.task)
           state = %{state | messages: messages}
@@ -488,7 +554,10 @@ defmodule Loomkin.Teams.Agent do
   @impl true
   def handle_info({:auto_execute_task, task_id}, state) do
     if state.status != :idle || state.loop_task != nil do
-      Logger.debug("[Agent:#{state.name}] Skipping auto-execute for #{task_id} — status is #{state.status}")
+      Logger.debug(
+        "[Agent:#{state.name}] Skipping auto-execute for #{task_id} — status is #{state.status}"
+      )
+
       {:noreply, state}
     else
       task = state.task
@@ -503,9 +572,10 @@ defmodule Loomkin.Teams.Agent do
       loop_opts = build_loop_opts(state)
       snapshot = build_snapshot(state)
 
-      async_task = Task.Supervisor.async_nolink(Loomkin.Teams.TaskSupervisor, fn ->
-        run_loop_with_escalation(messages, loop_opts, snapshot)
-      end)
+      async_task =
+        Task.Supervisor.async_nolink(Loomkin.Teams.TaskSupervisor, fn ->
+          run_loop_with_escalation(messages, loop_opts, snapshot)
+        end)
 
       {:noreply, %{state | loop_task: {async_task, nil}}}
     end
@@ -576,14 +646,21 @@ defmodule Loomkin.Teams.Agent do
       end
 
     summary = if results != "", do: "\nResults:\n#{results}", else: ""
-    msg = %{role: :system, content: "[System] Sub-team #{sub_team_id} completed and dissolved.#{summary}"}
+
+    msg = %{
+      role: :system,
+      content: "[System] Sub-team #{sub_team_id} completed and dissolved.#{summary}"
+    }
+
     {:noreply, %{state | messages: state.messages ++ [msg]}}
   end
 
   @impl true
   def handle_info({:role_changed, agent_name, old_role, new_role}, state) do
     if agent_name != state.name do
-      Logger.debug("[Agent:#{state.name}] Peer #{agent_name} changed role: #{old_role} -> #{new_role}")
+      Logger.debug(
+        "[Agent:#{state.name}] Peer #{agent_name} changed role: #{old_role} -> #{new_role}"
+      )
     end
 
     {:noreply, state}
@@ -770,7 +847,8 @@ defmodule Loomkin.Teams.Agent do
 
     msg = %{
       role: :system,
-      content: "[System] Tasks now available: #{Enum.join(task_ids, ", ")}. Use team_progress to see details."
+      content:
+        "[System] Tasks now available: #{Enum.join(task_ids, ", ")}. Use team_progress to see details."
     }
 
     {:noreply, %{state | messages: state.messages ++ [msg]}}
@@ -778,7 +856,10 @@ defmodule Loomkin.Teams.Agent do
 
   @impl true
   def handle_info({:role_change_request, agent_name, old_role, new_role, _request_id}, state) do
-    Logger.debug("[Agent:#{state.name}] Role change request: #{agent_name} #{old_role} -> #{new_role}")
+    Logger.debug(
+      "[Agent:#{state.name}] Role change request: #{agent_name} #{old_role} -> #{new_role}"
+    )
+
     {:noreply, state}
   end
 
@@ -786,10 +867,19 @@ defmodule Loomkin.Teams.Agent do
 
   @impl true
   def handle_info({:discovery_relevant, payload}, state) do
-    %{observation_title: obs_title, goal_title: goal_title, source_agent: source, keeper_id: keeper_id} = payload
+    %{
+      observation_title: obs_title,
+      goal_title: goal_title,
+      source_agent: source,
+      keeper_id: keeper_id
+    } = payload
 
     msg = "[Discovery from #{source}] #{obs_title} — relevant to your goal: #{goal_title}"
-    msg = if keeper_id, do: msg <> "\n  → Full context: context_retrieve on keeper #{keeper_id}", else: msg
+
+    msg =
+      if keeper_id,
+        do: msg <> "\n  → Full context: context_retrieve on keeper #{keeper_id}",
+        else: msg
 
     messages = state.messages ++ [%{role: :user, content: msg}]
     {:noreply, %{state | messages: messages}}
@@ -797,9 +887,16 @@ defmodule Loomkin.Teams.Agent do
 
   @impl true
   def handle_info({:confidence_warning, payload}, state) do
-    %{source_title: title, source_confidence: conf, affected_title: affected, keeper_id: keeper_id} = payload
+    %{
+      source_title: title,
+      source_confidence: conf,
+      affected_title: affected,
+      keeper_id: keeper_id
+    } = payload
 
-    msg = "[Confidence Warning] Upstream decision '#{title}' has low confidence (#{conf}). Your work on '#{affected}' may be affected."
+    msg =
+      "[Confidence Warning] Upstream decision '#{title}' has low confidence (#{conf}). Your work on '#{affected}' may be affected."
+
     msg = if keeper_id, do: msg <> "\n  → Re-evaluate using keeper #{keeper_id}", else: msg
 
     messages = state.messages ++ [%{role: :user, content: msg}]
@@ -839,11 +936,7 @@ defmodule Loomkin.Teams.Agent do
       {:ok, role_config} ->
         old_role = state.role
 
-        state = %{state |
-          role: new_role,
-          role_config: role_config,
-          tools: role_config.tools
-        }
+        state = %{state | role: new_role, role_config: role_config, tools: role_config.tools}
 
         # Update Registry metadata
         Registry.update_value(Loomkin.Teams.AgentRegistry, {state.team_id, state.name}, fn _old ->
@@ -876,7 +969,8 @@ defmodule Loomkin.Teams.Agent do
     Loomkin.Decisions.Graph.add_node(%{
       node_type: :observation,
       title: "Role change: #{agent_name} #{old_role} -> #{new_role}",
-      description: "Agent #{agent_name} in team #{team_id} changed role from #{old_role} to #{new_role}.",
+      description:
+        "Agent #{agent_name} in team #{team_id} changed role from #{old_role} to #{new_role}.",
       status: :active,
       session_id: team_id
     })
@@ -894,7 +988,8 @@ defmodule Loomkin.Teams.Agent do
       loop_opts = [
         model: model,
         tools: [],
-        system_prompt: "You are voting in a collective decision. Respond with only the chosen option text.",
+        system_prompt:
+          "You are voting in a collective decision. Respond with only the chosen option text.",
         project_path: state.project_path
       ]
 
@@ -1275,10 +1370,18 @@ defmodule Loomkin.Teams.Agent do
 
     case event_name do
       :stream_start ->
-        Phoenix.PubSub.broadcast(Loomkin.PubSub, topic, {:agent_stream_start, agent_name, payload})
+        Phoenix.PubSub.broadcast(
+          Loomkin.PubSub,
+          topic,
+          {:agent_stream_start, agent_name, payload}
+        )
 
       :stream_delta ->
-        Phoenix.PubSub.broadcast(Loomkin.PubSub, topic, {:agent_stream_delta, agent_name, payload})
+        Phoenix.PubSub.broadcast(
+          Loomkin.PubSub,
+          topic,
+          {:agent_stream_delta, agent_name, payload}
+        )
 
       :stream_end ->
         Phoenix.PubSub.broadcast(Loomkin.PubSub, topic, {:agent_stream_end, agent_name, payload})

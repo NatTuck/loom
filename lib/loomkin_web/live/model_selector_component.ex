@@ -59,7 +59,7 @@ defmodule LoomkinWeb.ModelSelectorComponent do
 
   def render(assigns) do
     ~H"""
-    <div id="model-selector" phx-hook="ModelSelector" class="relative">
+    <div id={@id} phx-hook="ModelSelector" class="relative">
       <%!-- Trigger --%>
       <button
         type="button"
@@ -68,13 +68,23 @@ defmodule LoomkinWeb.ModelSelectorComponent do
         class="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs press-down cursor-pointer"
         style={"border: 1px solid #{if @open, do: "var(--border-brand)", else: "var(--border-subtle)"}; color: var(--text-secondary); transition: all 150ms ease;"}
       >
+        <span
+          :if={assigns[:selector_mode]}
+          class="text-[10px] uppercase tracking-wider mr-0.5"
+          style="color: var(--text-muted);"
+        >
+          {if assigns[:selector_mode] == :fast, do: "Fast", else: "Thinking"}
+        </span>
         <span class="truncate max-w-[140px] font-medium" style="color: var(--text-primary);">
           {current_model_label(@model, @all_providers)}
         </span>
         <svg
           class={"w-3 h-3 transition-transform duration-150 #{if @open, do: "rotate-180"}"}
           style="color: var(--text-muted);"
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
         >
           <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
@@ -94,9 +104,16 @@ defmodule LoomkinWeb.ModelSelectorComponent do
             <svg
               class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
               style="color: var(--text-muted);"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
             <input
               type="text"
@@ -124,7 +141,10 @@ defmodule LoomkinWeb.ModelSelectorComponent do
                 myself={@myself}
               />
             <% end %>
-            <div :if={filtered_active(@unconfigured_providers, @search) == []} class="px-4 py-6 text-center">
+            <div
+              :if={filtered_active(@unconfigured_providers, @search) == []}
+              class="px-4 py-6 text-center"
+            >
               <p class="text-xs" style="color: var(--text-muted);">
                 No models match "<span style="color: var(--text-secondary);">{@search}</span>"
               </p>
@@ -145,9 +165,12 @@ defmodule LoomkinWeb.ModelSelectorComponent do
           <%!-- Empty state --%>
           <div :if={@active_providers == [] and @search == ""} class="px-4 py-6 text-center">
             <div class="text-2xl mb-2 opacity-50">&#128273;</div>
-            <p class="text-xs font-medium" style="color: var(--text-secondary);">No providers configured</p>
+            <p class="text-xs font-medium" style="color: var(--text-secondary);">
+              No providers configured
+            </p>
             <p class="text-[11px] mt-1" style="color: var(--text-muted);">
-              Add provider keys to your <span class="font-mono" style="color: var(--text-secondary);">.env</span>
+              Add provider keys to your
+              <span class="font-mono" style="color: var(--text-secondary);">.env</span>
               file or connect via OAuth
             </p>
           </div>
@@ -157,7 +180,10 @@ defmodule LoomkinWeb.ModelSelectorComponent do
         <.key_warning_banner model={@model} all_providers={@all_providers} myself={@myself} />
 
         <%!-- Unconfigured providers --%>
-        <div :if={@unconfigured_providers != [] and @search == ""} style="border-top: 1px solid var(--border-subtle);">
+        <div
+          :if={@unconfigured_providers != [] and @search == ""}
+          style="border-top: 1px solid var(--border-subtle);"
+        >
           <button
             type="button"
             phx-click="toggle_unconfigured"
@@ -179,18 +205,27 @@ defmodule LoomkinWeb.ModelSelectorComponent do
             </span>
             <svg
               class={"w-3 h-3 transition-transform duration-150 #{if @show_unconfigured, do: "rotate-180"}"}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
             >
               <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
 
-          <div :if={@show_unconfigured} class="max-h-48 overflow-y-auto" style="border-top: 1px solid var(--border-subtle); background: var(--surface-0);">
+          <div
+            :if={@show_unconfigured}
+            class="max-h-48 overflow-y-auto"
+            style="border-top: 1px solid var(--border-subtle); background: var(--surface-0);"
+          >
             <%= for {provider_atom, display_name, status, _models} <- @unconfigured_providers do %>
               <%= case status do %>
                 <% {:oauth, :disconnected} -> %>
                   <div class="flex items-center justify-between px-3 py-1.5 group/setup">
-                    <span class="text-[11px]" style="color: var(--text-secondary);">{display_name}</span>
+                    <span class="text-[11px]" style="color: var(--text-secondary);">
+                      {display_name}
+                    </span>
                     <button
                       type="button"
                       phx-click="start_oauth_flow"
@@ -205,7 +240,10 @@ defmodule LoomkinWeb.ModelSelectorComponent do
                 <% {:missing, env_var} -> %>
                   <div class="flex items-center justify-between px-3 py-1 group/setup">
                     <span class="text-[11px]" style="color: var(--text-muted);">{display_name}</span>
-                    <span class="text-[10px] font-mono transition-colors duration-150" style="color: var(--text-muted); opacity: 0.6;">
+                    <span
+                      class="text-[10px] font-mono transition-colors duration-150"
+                      style="color: var(--text-muted); opacity: 0.6;"
+                    >
                       {env_var}
                     </span>
                   </div>
@@ -233,7 +271,11 @@ defmodule LoomkinWeb.ModelSelectorComponent do
                 class="flex-1 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none font-mono"
                 style="background: var(--surface-1); border: 1px solid var(--border-subtle); color: var(--text-primary); caret-color: var(--brand);"
               />
-              <button type="submit" class="text-xs px-2 py-1.5 rounded-md" style="color: var(--text-brand);">
+              <button
+                type="submit"
+                class="text-xs px-2 py-1.5 rounded-md"
+                style="color: var(--text-brand);"
+              >
                 Use
               </button>
               <button
@@ -364,7 +406,12 @@ defmodule LoomkinWeb.ModelSelectorComponent do
     ~H"""
     <div class="px-1.5 pt-2.5 pb-0.5">
       <div class="flex items-center justify-between px-1.5 mb-0.5">
-        <span class="text-[10px] font-semibold uppercase tracking-wider" style="color: var(--text-muted);">{@display_name}</span>
+        <span
+          class="text-[10px] font-semibold uppercase tracking-wider"
+          style="color: var(--text-muted);"
+        >
+          {@display_name}
+        </span>
         <div class="flex items-center gap-1">
           <%= case @key_status do %>
             <% {:set, _env_var} -> %>
@@ -385,7 +432,9 @@ defmodule LoomkinWeb.ModelSelectorComponent do
             <% {:missing, env_var} -> %>
               <span class="flex items-center gap-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-amber-400/60"></span>
-                <span class="text-[10px] font-mono" style="color: rgba(251, 191, 36, 0.6);">{env_var}</span>
+                <span class="text-[10px] font-mono" style="color: rgba(251, 191, 36, 0.6);">
+                  {env_var}
+                </span>
               </span>
           <% end %>
         </div>
@@ -398,21 +447,44 @@ defmodule LoomkinWeb.ModelSelectorComponent do
           phx-value-model={value}
           phx-target={@myself}
           class="flex items-center justify-between w-full px-1.5 py-1 rounded-md text-left transition-all duration-100 group/item interactive"
-          style={if value == @current_model, do: "background: rgba(124, 58, 237, 0.12); box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.2);", else: ""}
+          style={
+            if value == @current_model,
+              do:
+                "background: rgba(124, 58, 237, 0.12); box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.2);",
+              else: ""
+          }
         >
           <div class="flex items-center gap-1.5 min-w-0">
             <%= if value == @current_model do %>
-              <svg class="w-3 h-3 shrink-0" style="color: var(--text-brand);" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+              <svg
+                class="w-3 h-3 shrink-0"
+                style="color: var(--text-brand);"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="3"
+              >
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             <% else %>
               <div class="w-3 h-3 shrink-0"></div>
             <% end %>
-            <span class="text-xs truncate" style={if value == @current_model, do: "color: var(--text-brand); font-weight: 500;", else: "color: var(--text-secondary);"}>
+            <span
+              class="text-xs truncate"
+              style={
+                if value == @current_model,
+                  do: "color: var(--text-brand); font-weight: 500;",
+                  else: "color: var(--text-secondary);"
+              }
+            >
               {label}
             </span>
           </div>
-          <span :if={context_k} class="text-[10px] font-mono shrink-0 ml-2" style="color: var(--text-muted);">
+          <span
+            :if={context_k}
+            class="text-[10px] font-mono shrink-0 ml-2"
+            style="color: var(--text-muted);"
+          >
             {context_k}
           </span>
         </button>
@@ -442,7 +514,10 @@ defmodule LoomkinWeb.ModelSelectorComponent do
     ~H"""
     <%= case @warning do %>
       <% {:api_key, env_var} -> %>
-        <div class="px-3 py-2" style="border-top: 1px solid rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.05);">
+        <div
+          class="px-3 py-2"
+          style="border-top: 1px solid rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.05);"
+        >
           <div class="flex items-start gap-2">
             <span class="text-amber-400 text-xs mt-0.5">&#9888;</span>
             <div class="text-xs">
@@ -450,7 +525,8 @@ defmodule LoomkinWeb.ModelSelectorComponent do
                 <span class="font-mono text-amber-400">{env_var}</span> not found
               </p>
               <p class="mt-1" style="color: var(--text-muted);">
-                Add to <span class="font-mono" style="color: var(--text-secondary);">.env</span> or export in shell
+                Add to <span class="font-mono" style="color: var(--text-secondary);">.env</span>
+                or export in shell
               </p>
             </div>
           </div>
@@ -499,7 +575,10 @@ defmodule LoomkinWeb.ModelSelectorComponent do
   end
 
   def handle_event("select_model", %{"model" => model}, socket) do
-    send(self(), {:change_model, model})
+    event =
+      if socket.assigns[:selector_mode] == :fast, do: :change_fast_model, else: :change_model
+
+    send(self(), {event, model})
     {:noreply, assign(socket, open: false, search: "")}
   end
 
@@ -512,7 +591,10 @@ defmodule LoomkinWeb.ModelSelectorComponent do
   end
 
   def handle_event("apply_custom", %{"model" => model}, socket) when model != "" do
-    send(self(), {:change_model, model})
+    event =
+      if socket.assigns[:selector_mode] == :fast, do: :change_fast_model, else: :change_model
+
+    send(self(), {event, model})
     {:noreply, assign(socket, custom_mode: false, custom_value: "", open: false)}
   end
 

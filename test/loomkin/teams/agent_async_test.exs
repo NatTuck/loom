@@ -219,9 +219,9 @@ defmodule Loomkin.Teams.AgentAsyncTest do
 
       # Warning should be queued as inject_system_message (not in messages yet)
       assert Enum.any?(state.priority_queue, fn
-        {:inject_system_message, content} -> String.contains?(content, "File conflict")
-        _ -> false
-      end)
+               {:inject_system_message, content} -> String.contains?(content, "File conflict")
+               _ -> false
+             end)
     end
 
     test "file_conflict warning survives loop completion via drain" do
@@ -232,12 +232,13 @@ defmodule Loomkin.Teams.AgentAsyncTest do
 
       # Simulate active loop with a queued file_conflict inject
       :sys.replace_state(pid, fn state ->
-        %{state |
-          loop_task: {fake_task, nil},
-          status: :working,
-          priority_queue: [
-            {:inject_system_message, "[URGENT] File conflict detected: %{file: \"lib/foo.ex\"}"}
-          ]
+        %{
+          state
+          | loop_task: {fake_task, nil},
+            status: :working,
+            priority_queue: [
+              {:inject_system_message, "[URGENT] File conflict detected: %{file: \"lib/foo.ex\"}"}
+            ]
         }
       end)
 
@@ -246,9 +247,10 @@ defmodule Loomkin.Teams.AgentAsyncTest do
       Process.sleep(100)
 
       state = :sys.get_state(pid)
+
       assert Enum.any?(state.messages, fn msg ->
-        msg.role == :system && String.contains?(msg.content, "File conflict")
-      end)
+               msg.role == :system && String.contains?(msg.content, "File conflict")
+             end)
     end
 
     test "multiple messages accumulate in correct queues" do
@@ -319,7 +321,11 @@ defmodule Loomkin.Teams.AgentAsyncTest do
       end)
 
       # Send a fake loop result
-      send(pid, {ref, {:loop_ok, "done!", [%{role: :assistant, content: "done!"}], %{usage: %{}}}})
+      send(
+        pid,
+        {ref, {:loop_ok, "done!", [%{role: :assistant, content: "done!"}], %{usage: %{}}}}
+      )
+
       Process.sleep(50)
 
       state = :sys.get_state(pid)
@@ -372,11 +378,12 @@ defmodule Loomkin.Teams.AgentAsyncTest do
       fake_task = %Task{pid: self(), ref: ref, owner: self(), mfa: {__MODULE__, :fake, []}}
 
       :sys.replace_state(pid, fn state ->
-        %{state |
-          loop_task: {fake_task, nil},
-          status: :working,
-          pending_updates: [{:context_update, "peer-1", %{v: 1}}],
-          priority_queue: [{:tasks_unblocked, ["t1"]}]
+        %{
+          state
+          | loop_task: {fake_task, nil},
+            status: :working,
+            pending_updates: [{:context_update, "peer-1", %{v: 1}}],
+            priority_queue: [{:tasks_unblocked, ["t1"]}]
         }
       end)
 

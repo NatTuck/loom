@@ -1,7 +1,7 @@
 defmodule Loomkin.Tools.TeamSpawn do
   @moduledoc "Spawn a team with agents."
 
-  @valid_roles ~w(lead researcher coder reviewer tester)
+  @valid_roles ~w(lead researcher coder reviewer tester concierge orienter)
 
   use Jido.Action,
     name: "team_spawn",
@@ -13,7 +13,12 @@ defmodule Loomkin.Tools.TeamSpawn do
         "Returns a team status summary with team_id and agent list.",
     schema: [
       team_name: [type: :string, required: true, doc: "Human-readable team name"],
-      roles: [type: {:list, :map}, required: true, doc: "List of %{name, role} maps. role must be one of: researcher, coder, reviewer, tester, lead"],
+      roles: [
+        type: {:list, :map},
+        required: true,
+        doc:
+          "List of %{name, role} maps. role must be one of: researcher, coder, reviewer, tester, lead"
+      ],
       project_path: [type: :string, doc: "Path to the project for agents to work on"]
     ]
 
@@ -27,15 +32,19 @@ defmodule Loomkin.Tools.TeamSpawn do
     project_path = param(params, :project_path) || param(context, :project_path)
     parent_team_id = param(context, :parent_team_id)
     model = param(context, :model)
+    agent_name = param(context, :agent_name) || "architect"
 
     roles = param!(params, :roles)
-    spawn_from_roles(team_name, roles, project_path, parent_team_id, model)
+    spawn_from_roles(team_name, roles, project_path, parent_team_id, model, agent_name)
   end
 
-  defp spawn_from_roles(team_name, roles, project_path, parent_team_id, model) do
+  defp spawn_from_roles(team_name, roles, project_path, parent_team_id, model, agent_name) do
     {:ok, team_id} =
       if parent_team_id do
-        Manager.create_sub_team(parent_team_id, "architect", name: team_name, project_path: project_path)
+        Manager.create_sub_team(parent_team_id, agent_name,
+          name: team_name,
+          project_path: project_path
+        )
       else
         Manager.create_team(name: team_name, project_path: project_path)
       end
@@ -83,17 +92,36 @@ defmodule Loomkin.Tools.TeamSpawn do
     else
       # Keyword-based fuzzy match for descriptive role strings
       cond do
-        String.contains?(downcased, "review") -> :reviewer
-        String.contains?(downcased, "test") -> :tester
-        String.contains?(downcased, "code") or String.contains?(downcased, "implement") -> :coder
+        String.contains?(downcased, "review") ->
+          :reviewer
+
+        String.contains?(downcased, "test") ->
+          :tester
+
+        String.contains?(downcased, "code") or String.contains?(downcased, "implement") ->
+          :coder
+
         String.contains?(downcased, "research") or String.contains?(downcased, "analy") or
           String.contains?(downcased, "audit") or String.contains?(downcased, "explor") or
-          String.contains?(downcased, "investigat") or String.contains?(downcased, "document") -> :researcher
-        String.contains?(downcased, "lead") or String.contains?(downcased, "coordinat") -> :lead
+          String.contains?(downcased, "investigat") or String.contains?(downcased, "document") ->
+          :researcher
+
+        String.contains?(downcased, "lead") or String.contains?(downcased, "coordinat") ->
+          :lead
+
+        String.contains?(downcased, "concierge") or String.contains?(downcased, "host") ->
+          :concierge
+
+        String.contains?(downcased, "orient") or String.contains?(downcased, "scanner") ->
+          :orienter
+
         # If the LLM sends a security/quality/architecture analysis role, map to researcher
         String.contains?(downcased, "security") or String.contains?(downcased, "quality") or
-          String.contains?(downcased, "architect") or String.contains?(downcased, "coverage") -> :researcher
-        true -> nil
+          String.contains?(downcased, "architect") or String.contains?(downcased, "coverage") ->
+          :researcher
+
+        true ->
+          nil
       end
     end
   end

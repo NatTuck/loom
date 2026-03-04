@@ -25,6 +25,7 @@ defmodule Loomkin.Teams.AgentTest do
       %{pid: pid, team_id: team_id, name: name} = start_agent()
 
       assert Process.alive?(pid)
+
       assert [{^pid, %{role: :coder, status: :idle}}] =
                Registry.lookup(Loomkin.Teams.AgentRegistry, {team_id, name})
     end
@@ -266,12 +267,13 @@ defmodule Loomkin.Teams.AgentTest do
       Phoenix.PubSub.broadcast(
         Loomkin.PubSub,
         "team:#{team_id}",
-        {:discovery_relevant, %{
-          observation_title: "Cache hit rate dropped",
-          goal_title: "Improve API latency",
-          source_agent: "researcher-1",
-          keeper_id: nil
-        }}
+        {:discovery_relevant,
+         %{
+           observation_title: "Cache hit rate dropped",
+           goal_title: "Improve API latency",
+           source_agent: "researcher-1",
+           keeper_id: nil
+         }}
       )
 
       Process.sleep(50)
@@ -292,12 +294,13 @@ defmodule Loomkin.Teams.AgentTest do
       Phoenix.PubSub.broadcast(
         Loomkin.PubSub,
         "team:#{team_id}",
-        {:discovery_relevant, %{
-          observation_title: "Memory leak found",
-          goal_title: "Stabilize production",
-          source_agent: "coder-2",
-          keeper_id: "keeper-xyz-789"
-        }}
+        {:discovery_relevant,
+         %{
+           observation_title: "Memory leak found",
+           goal_title: "Stabilize production",
+           source_agent: "coder-2",
+           keeper_id: "keeper-xyz-789"
+         }}
       )
 
       Process.sleep(50)
@@ -315,12 +318,13 @@ defmodule Loomkin.Teams.AgentTest do
       Phoenix.PubSub.broadcast(
         Loomkin.PubSub,
         "team:#{team_id}",
-        {:confidence_warning, %{
-          source_title: "Use PostgreSQL",
-          source_confidence: 35,
-          affected_title: "Design schema migration",
-          keeper_id: nil
-        }}
+        {:confidence_warning,
+         %{
+           source_title: "Use PostgreSQL",
+           source_confidence: 35,
+           affected_title: "Design schema migration",
+           keeper_id: nil
+         }}
       )
 
       Process.sleep(50)
@@ -341,12 +345,13 @@ defmodule Loomkin.Teams.AgentTest do
       Phoenix.PubSub.broadcast(
         Loomkin.PubSub,
         "team:#{team_id}",
-        {:confidence_warning, %{
-          source_title: "Use Redis",
-          source_confidence: 20,
-          affected_title: "Cache layer impl",
-          keeper_id: "keeper-abc-123"
-        }}
+        {:confidence_warning,
+         %{
+           source_title: "Use Redis",
+           source_confidence: 20,
+           affected_title: "Cache layer impl",
+           keeper_id: "keeper-abc-123"
+         }}
       )
 
       Process.sleep(50)
@@ -362,23 +367,25 @@ defmodule Loomkin.Teams.AgentTest do
       Phoenix.PubSub.broadcast(
         Loomkin.PubSub,
         "team:#{team_id}",
-        {:discovery_relevant, %{
-          observation_title: "Obs 1",
-          goal_title: "Goal 1",
-          source_agent: "agent-a",
-          keeper_id: nil
-        }}
+        {:discovery_relevant,
+         %{
+           observation_title: "Obs 1",
+           goal_title: "Goal 1",
+           source_agent: "agent-a",
+           keeper_id: nil
+         }}
       )
 
       Phoenix.PubSub.broadcast(
         Loomkin.PubSub,
         "team:#{team_id}",
-        {:confidence_warning, %{
-          source_title: "Decision X",
-          source_confidence: 25,
-          affected_title: "Task Y",
-          keeper_id: nil
-        }}
+        {:confidence_warning,
+         %{
+           source_title: "Decision X",
+           source_confidence: 25,
+           affected_title: "Task Y",
+           keeper_id: nil
+         }}
       )
 
       Process.sleep(50)

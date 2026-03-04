@@ -14,6 +14,8 @@ defmodule Loomkin.Schemas.Session do
     field :cost_usd, :decimal, default: Decimal.new("0")
     field :summary_message_id, :binary_id
     field :project_path, :string
+    field :fast_model, :string
+    field :team_id, :string
 
     has_many :messages, Loomkin.Schemas.Message
 
@@ -21,7 +23,7 @@ defmodule Loomkin.Schemas.Session do
   end
 
   @required_fields ~w(model project_path)a
-  @optional_fields ~w(title status prompt_tokens completion_tokens cost_usd summary_message_id)a
+  @optional_fields ~w(title status prompt_tokens completion_tokens cost_usd summary_message_id fast_model team_id)a
 
   def changeset(session, attrs) do
     session

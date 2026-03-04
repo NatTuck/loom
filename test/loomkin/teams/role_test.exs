@@ -24,6 +24,14 @@ defmodule Loomkin.Teams.RoleTest do
       assert {:ok, %Role{name: :tester}} = Role.get(:tester)
     end
 
+    test "returns :concierge role with correct config" do
+      assert {:ok, %Role{name: :concierge}} = Role.get(:concierge)
+    end
+
+    test "returns :orienter role with correct config" do
+      assert {:ok, %Role{name: :orienter}} = Role.get(:orienter)
+    end
+
     test "returns error for unknown role" do
       assert {:error, :unknown_role} = Role.get(:nonexistent)
     end
@@ -118,14 +126,16 @@ defmodule Loomkin.Teams.RoleTest do
   end
 
   describe "built_in_roles/0" do
-    test "lists all five built-in roles" do
+    test "lists all seven built-in roles" do
       roles = Role.built_in_roles()
-      assert length(roles) == 5
+      assert length(roles) == 7
       assert :lead in roles
       assert :researcher in roles
       assert :coder in roles
       assert :reviewer in roles
       assert :tester in roles
+      assert :concierge in roles
+      assert :orienter in roles
     end
   end
 
@@ -170,12 +180,18 @@ defmodule Loomkin.Teams.RoleTest do
   end
 
   describe "uniform model default" do
-    test "all built-in roles use :default model_tier" do
-      for role_name <- Role.built_in_roles() do
+    test "most built-in roles use :default model_tier" do
+      for role_name <- Role.built_in_roles(), role_name != :orienter do
         {:ok, role} = Role.get(role_name)
+
         assert role.model_tier == :default,
                "Expected #{role_name} to have model_tier :default, got #{inspect(role.model_tier)}"
       end
+    end
+
+    test "orienter uses :fast model_tier" do
+      {:ok, role} = Role.get(:orienter)
+      assert role.model_tier == :fast
     end
   end
 

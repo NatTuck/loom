@@ -153,9 +153,7 @@ defmodule Loomkin.Teams.AgentProactivityTest do
       messages = [%{role: :user, content: "database schema analysis"}]
 
       {:ok, _keeper_pid, _entry} =
-        ContextOffload.offload_to_keeper(team_id, "other-agent", messages,
-          topic: "db schema"
-        )
+        ContextOffload.offload_to_keeper(team_id, "other-agent", messages, topic: "db schema")
 
       # Give agent time to receive the broadcast
       Process.sleep(100)

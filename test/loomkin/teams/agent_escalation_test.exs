@@ -55,7 +55,13 @@ defmodule Loomkin.Teams.AgentEscalationTest do
     test "full escalation sequence with configured chain: failures -> check -> escalate -> track",
          ctx do
       starting_model = "zai:glm-4.5"
-      chain = ["zai:glm-4.5", "zai:glm-5", "anthropic:claude-sonnet-4-6", "anthropic:claude-opus-4-6"]
+
+      chain = [
+        "zai:glm-4.5",
+        "zai:glm-5",
+        "anthropic:claude-sonnet-4-6",
+        "anthropic:claude-opus-4-6"
+      ]
 
       # Configure escalation chain
       Loomkin.Config.put(:teams, %{models: %{escalation: chain}})
@@ -88,7 +94,12 @@ defmodule Loomkin.Teams.AgentEscalationTest do
     end
 
     test "full chain escalation through all tiers with configured escalation", ctx do
-      chain = ["zai:glm-4.5", "zai:glm-5", "anthropic:claude-sonnet-4-6", "anthropic:claude-opus-4-6"]
+      chain = [
+        "zai:glm-4.5",
+        "zai:glm-5",
+        "anthropic:claude-sonnet-4-6",
+        "anthropic:claude-opus-4-6"
+      ]
 
       # Configure escalation chain
       Loomkin.Config.put(:teams, %{models: %{escalation: chain}})
@@ -116,7 +127,13 @@ defmodule Loomkin.Teams.AgentEscalationTest do
 
     test "success after escalation records correctly with configured chain", ctx do
       current_model = "zai:glm-5"
-      chain = ["zai:glm-4.5", "zai:glm-5", "anthropic:claude-sonnet-4-6", "anthropic:claude-opus-4-6"]
+
+      chain = [
+        "zai:glm-4.5",
+        "zai:glm-5",
+        "anthropic:claude-sonnet-4-6",
+        "anthropic:claude-opus-4-6"
+      ]
 
       # Configure escalation chain
       Loomkin.Config.put(:teams, %{models: %{escalation: chain}})
