@@ -132,6 +132,31 @@ defmodule LoomkinWeb.WorkspaceLive do
         _, _ -> effective_model
       end
 
+    # Proactively read team_id from session — covers the case where the team
+    # was created during start_session but the :team_available PubSub event
+    # hasn't been processed yet (common with longpoll reconnections).
+    team_id_from_session =
+      try do
+        Session.get_team_id(pid)
+      catch
+        _, _ -> nil
+      end
+
+    socket =
+      if team_id_from_session do
+        bindings = load_channel_bindings(team_id_from_session)
+
+        socket
+        |> assign(
+          team_id: team_id_from_session,
+          active_team_id: team_id_from_session,
+          mode: :mission_control,
+          channel_bindings: bindings
+        )
+      else
+        socket
+      end
+
     socket =
       if connected?(socket) do
         Session.subscribe(session_id)
