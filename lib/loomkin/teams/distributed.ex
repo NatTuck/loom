@@ -18,8 +18,6 @@ defmodule Loomkin.Teams.Distributed do
 
   alias Loomkin.Teams.Cluster
 
-  require Logger
-
   @distributed_supervisor Loomkin.Teams.DistributedAgentSupervisor
   @distributed_registry Loomkin.Teams.DistributedAgentRegistry
 

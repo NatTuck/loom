@@ -5,11 +5,11 @@ defmodule LoomkinWeb.WorkspaceLive do
   alias Loomkin.Session.Manager
   alias Loomkin.Teams
 
-  require Logger
   @max_activity_events 200
   @max_messages 200
   @max_diffs 100
   @max_shell_commands 100
+  @roster_debounce_ms 50
 
   def mount(params, _session, socket) do
     socket =
@@ -44,6 +44,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         agent_cards: %{},
         comms_events: [],
         roster_version: 0,
+        roster_refresh_timer: nil,
         mode: :mission_control,
         focused_agent: nil,
         inspector_mode: :auto_follow,
@@ -97,10 +98,6 @@ defmodule LoomkinWeb.WorkspaceLive do
     tools = Loomkin.Tools.Registry.for_lead()
     project_path = project_path || File.cwd!()
 
-    Logger.debug(
-      "[WorkspaceLive] start_and_subscribe session=#{session_id} connected=#{connected?(socket)}"
-    )
-
     {:ok, pid} =
       Manager.start_session(
         session_id: session_id,
@@ -110,8 +107,6 @@ defmodule LoomkinWeb.WorkspaceLive do
         tools: tools,
         auto_approve: false
       )
-
-    Logger.info("[WorkspaceLive] Session started pid=#{inspect(pid)}")
 
     # Read the effective model back from the session — for resumed sessions
     # this will be the DB-persisted model, not the mount default.
@@ -174,6 +169,20 @@ defmodule LoomkinWeb.WorkspaceLive do
         else
           socket
         end
+      else
+        socket
+      end
+
+    # Ensure roster and cards are populated for resumed sessions with existing teams
+    socket =
+      if socket.assigns[:active_team_id] do
+        require Logger
+
+        Logger.info(
+          "[Kin:UI] start_and_subscribe team=#{socket.assigns[:active_team_id]} — initial roster loaded"
+        )
+
+        socket |> refresh_roster() |> sync_cards_with_roster()
       else
         socket
       end
@@ -319,10 +328,6 @@ defmodule LoomkinWeb.WorkspaceLive do
         # Normal flow: send through Architect pipeline
         session_id = socket.assigns.session_id
 
-        Logger.info(
-          "[WorkspaceLive] Sending message via Architect session=#{session_id} mode=#{socket.assigns.mode} active_team_id=#{inspect(socket.assigns[:active_team_id])}"
-        )
-
         task =
           Task.Supervisor.async_nolink(Loomkin.Teams.TaskSupervisor, fn ->
             Session.send_message(session_id, trimmed)
@@ -339,7 +344,7 @@ defmodule LoomkinWeb.WorkspaceLive do
               content: trimmed,
               timestamp: DateTime.utc_now(),
               expanded: false,
-              metadata: %{from: "You", to: "Team"}
+              metadata: %{from: "You", to: "Kin"}
             }
 
             events = socket.assigns.activity_events ++ [user_event]
@@ -376,7 +381,7 @@ defmodule LoomkinWeb.WorkspaceLive do
            async_task: task,
            status: :thinking,
            messages: updated_messages,
-           last_user_message: %{text: trimmed, to: "Team"}
+           last_user_message: %{text: trimmed, to: "Kin"}
          )
          |> push_event("clear-input", %{})}
     end
@@ -833,7 +838,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         Loomkin.Teams.Agent.edit_queued(pid, id, content)
 
       :error ->
-        Logger.warning("[WorkspaceLive] Cannot edit queued — agent #{agent_name} not found")
+        :ok
     end
 
     {:noreply, assign(socket, queue_editing_id: nil)}
@@ -847,7 +852,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         Loomkin.Teams.Agent.delete_queued(pid, id)
 
       :error ->
-        Logger.warning("[WorkspaceLive] Cannot delete queued — agent #{agent_name} not found")
+        :ok
     end
 
     {:noreply, socket}
@@ -862,7 +867,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         Enum.each(ids, fn id -> Loomkin.Teams.Agent.delete_queued(pid, id) end)
 
       :error ->
-        Logger.warning("[WorkspaceLive] Cannot delete queued — agent #{agent_name} not found")
+        :ok
     end
 
     {:noreply, assign(socket, queue_selected_ids: MapSet.new())}
@@ -877,7 +882,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         Loomkin.Teams.Agent.squash_queued(pid, ids)
 
       :error ->
-        Logger.warning("[WorkspaceLive] Cannot squash queued — agent #{agent_name} not found")
+        :ok
     end
 
     {:noreply, assign(socket, queue_selected_ids: MapSet.new())}
@@ -891,7 +896,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         Loomkin.Teams.Agent.reorder_queue(pid, :pending, ordered_ids)
 
       :error ->
-        Logger.warning("[WorkspaceLive] Cannot reorder queue — agent #{agent_name} not found")
+        :ok
     end
 
     {:noreply, socket}
@@ -966,7 +971,7 @@ defmodule LoomkinWeb.WorkspaceLive do
               Loomkin.Teams.Agent.enqueue(pid, text, source: :user, priority: :normal)
 
             :error ->
-              Logger.warning("[WorkspaceLive] Cannot enqueue — agent #{agent_name} not found")
+              :ok
           end
 
           {:noreply,
@@ -994,9 +999,7 @@ defmodule LoomkinWeb.WorkspaceLive do
               Loomkin.Teams.Agent.inject_guidance(pid, text)
 
             :error ->
-              Logger.warning(
-                "[WorkspaceLive] Cannot inject guidance — agent #{agent_name} not found"
-              )
+              :ok
           end
 
           guidance_event = %{
@@ -1044,6 +1047,22 @@ defmodule LoomkinWeb.WorkspaceLive do
   # Converts Jido.Signal structs from the Bus into the tuple format
   # that existing handle_info clauses expect. As more modules migrate to
   # signals, eventually the tuple clauses will be removed.
+
+  # child_team_created carries the NEW team_id which isn't subscribed yet —
+  # accept it if the parent_team_id belongs to this workspace
+  def handle_info(
+        {:signal, %Jido.Signal{type: "team.child.created"} = sig},
+        socket
+      ) do
+    parent_id = sig.data[:parent_team_id]
+    subscribed = socket.assigns[:subscribed_teams] || MapSet.new()
+
+    if parent_id && MapSet.member?(subscribed, parent_id) do
+      handle_info(sig, socket)
+    else
+      {:noreply, socket}
+    end
+  end
 
   def handle_info({:signal, %Jido.Signal{} = sig}, socket) do
     if signal_for_workspace?(sig, socket) do
@@ -1207,9 +1226,8 @@ defmodule LoomkinWeb.WorkspaceLive do
     handle_info({:queue_updated, agent_name, queue}, socket)
   end
 
-  # Catch-all for unhandled signal types — log and ignore
-  def handle_info(%Jido.Signal{type: type}, socket) do
-    Logger.debug("[WorkspaceLive] Unhandled signal type: #{type}")
+  # Catch-all for unhandled signal types — ignore
+  def handle_info(%Jido.Signal{type: _type}, socket) do
     {:noreply, socket}
   end
 
@@ -1221,10 +1239,6 @@ defmodule LoomkinWeb.WorkspaceLive do
   end
 
   def handle_info({:new_message, _session_id, msg}, socket) do
-    Logger.info(
-      "[WorkspaceLive] :new_message role=#{msg.role} content_len=#{String.length(msg.content || "")}"
-    )
-
     socket = assign(socket, messages: Enum.take(socket.assigns.messages ++ [msg], -@max_messages))
 
     # Also add assistant messages to activity feed for mission control mode
@@ -1286,8 +1300,6 @@ defmodule LoomkinWeb.WorkspaceLive do
   end
 
   def handle_info({:tool_executing, source, %{tool_name: name}} = event, socket) do
-    Logger.info("[WorkspaceLive] :tool_executing source=#{inspect(source)} tool=#{name}")
-
     socket =
       socket
       |> forward_to_activity(event)
@@ -1363,7 +1375,8 @@ defmodule LoomkinWeb.WorkspaceLive do
   end
 
   def handle_info({:team_available, _session_id, team_id}, socket) do
-    Logger.info("[WorkspaceLive] :team_available received team_id=#{team_id}")
+    require Logger
+    Logger.info("[Kin:UI] :team_available team=#{team_id}")
     bindings = load_channel_bindings(team_id)
 
     socket =
@@ -1376,12 +1389,16 @@ defmodule LoomkinWeb.WorkspaceLive do
         channel_bindings: bindings
       )
       |> refresh_roster()
+      |> sync_cards_with_roster()
+
+    Logger.info(
+      "[Kin:UI] :team_available complete — cards=#{inspect(Map.keys(socket.assigns.agent_cards))}"
+    )
 
     {:noreply, socket}
   end
 
   def handle_info({:child_team_available, _session_id, child_team_id}, socket) do
-    Logger.info("[WorkspaceLive] :child_team_available child_team_id=#{child_team_id}")
     socket = subscribe_to_team(socket, child_team_id)
 
     child_teams =
@@ -1395,7 +1412,20 @@ defmodule LoomkinWeb.WorkspaceLive do
       socket
       |> assign(child_teams: child_teams, mode: :mission_control)
       |> update(:roster_version, &((&1 || 0) + 1))
+      |> schedule_roster_refresh()
+
+    {:noreply, socket}
+  end
+
+  def handle_info(:debounced_roster_refresh, socket) do
+    require Logger
+    Logger.debug("[Kin:UI] debounced roster refresh fired")
+
+    socket =
+      socket
       |> refresh_roster()
+      |> sync_cards_with_roster()
+      |> assign(roster_refresh_timer: nil)
 
     {:noreply, socket}
   end
@@ -1433,7 +1463,6 @@ defmodule LoomkinWeb.WorkspaceLive do
   # --- Architect Steps ---
 
   def handle_info({:architect_phase, phase}, socket) do
-    Logger.info("[WorkspaceLive] :architect_phase phase=#{phase}")
     {:noreply, assign(socket, architect_phase: phase)}
   end
 
@@ -1552,14 +1581,12 @@ defmodule LoomkinWeb.WorkspaceLive do
 
   # Team PubSub events -- forward to team components via send_update
   def handle_info({:agent_status, agent_name, status} = event, socket) do
-    Logger.debug("[WorkspaceLive] :agent_status agent=#{agent_name} status=#{status}")
     forward_to_team_components(socket)
 
     socket =
       socket
       |> update(:roster_version, &((&1 || 0) + 1))
-      |> refresh_roster()
-      |> sync_cards_with_roster()
+      |> schedule_roster_refresh()
       |> update_card_status(agent_name, status)
       |> forward_to_cards_and_comms(event)
 
@@ -1570,7 +1597,10 @@ defmodule LoomkinWeb.WorkspaceLive do
     forward_to_dashboard(socket)
 
     {:noreply,
-     socket |> refresh_roster() |> forward_to_activity(event) |> forward_to_cards_and_comms(event)}
+     socket
+     |> schedule_roster_refresh()
+     |> forward_to_activity(event)
+     |> forward_to_cards_and_comms(event)}
   end
 
   def handle_info({:task_assigned, task_id, agent_name} = event, socket) do
@@ -1584,7 +1614,7 @@ defmodule LoomkinWeb.WorkspaceLive do
 
     socket =
       socket
-      |> refresh_roster()
+      |> schedule_roster_refresh()
       |> forward_to_activity(event)
       |> forward_to_cards_and_comms(event)
       |> update_card_task(agent_name, task_title)
@@ -1649,9 +1679,9 @@ defmodule LoomkinWeb.WorkspaceLive do
     {:noreply, socket |> forward_to_activity(event) |> forward_to_cards_and_comms(event)}
   end
 
-  def handle_info({:usage, _agent_name, _payload}, socket) do
+  def handle_info({:usage, agent_name, payload}, socket) do
     forward_to_cost(socket)
-    {:noreply, socket}
+    {:noreply, update_card_budget(socket, agent_name, payload)}
   end
 
   # Agent error events (max iterations exceeded, tool failures, etc.)
@@ -1767,6 +1797,9 @@ defmodule LoomkinWeb.WorkspaceLive do
   end
 
   def handle_info({:child_team_created, child_team_id}, socket) do
+    require Logger
+    Logger.info("[Kin:UI] :child_team_created child=#{child_team_id}")
+
     child_teams =
       if child_team_id in socket.assigns.child_teams do
         socket.assigns.child_teams
@@ -1860,38 +1893,25 @@ defmodule LoomkinWeb.WorkspaceLive do
       %Task{ref: ^ref} ->
         socket =
           case result do
-            {:ok, response} ->
-              Logger.info(
-                "[WorkspaceLive] Async task completed OK response=#{inspect(response, limit: 200)}"
-              )
-
+            {:ok, _response} ->
               socket
 
             {:error, :cancelled} ->
               # User-initiated cancel — no error flash needed
-              Logger.debug("[WorkspaceLive] Async task cancelled by user")
               assign(socket, streaming: false, streaming_content: "")
 
             {:error, :busy} ->
               # Agent is busy with another task — show a gentle warning
-              Logger.debug("[WorkspaceLive] Agent is busy, message queued or dropped")
-
               socket
               |> assign(streaming: false, streaming_content: "")
               |> put_flash(:info, "Agent is busy — try again in a moment")
 
             {:error, reason} ->
-              Logger.error("[WorkspaceLive] Async task returned error: #{inspect(reason)}")
-
               socket
               |> assign(streaming: false, streaming_content: "")
               |> put_flash(:error, format_llm_error(reason))
 
-            other ->
-              Logger.warning(
-                "[WorkspaceLive] Async task returned unexpected result: #{inspect(other)}"
-              )
-
+            _other ->
               socket
           end
 
@@ -1903,14 +1923,9 @@ defmodule LoomkinWeb.WorkspaceLive do
     end
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, reason}, socket) when is_reference(ref) do
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, socket) when is_reference(ref) do
     case socket.assigns[:async_task] do
       %Task{ref: ^ref} ->
-        # :killed is expected when user cancels (Task.shutdown(:brutal_kill))
-        if reason not in [:normal, :killed] do
-          Logger.error("[WorkspaceLive] Async task crashed: #{inspect(reason)}")
-        end
-
         {:noreply, assign(socket, async_task: nil, status: :idle)}
 
       _ ->
@@ -1956,10 +1971,9 @@ defmodule LoomkinWeb.WorkspaceLive do
     case find_agent_pid(socket, agent_name, team_id) do
       {:ok, pid} ->
         Loomkin.Teams.Agent.request_pause(pid)
-        Logger.debug("[WorkspaceLive] Pause requested for #{agent_name}")
 
       :error ->
-        Logger.warning("[WorkspaceLive] Cannot pause — agent #{agent_name} not found")
+        :ok
     end
 
     {:noreply, socket}
@@ -1972,10 +1986,8 @@ defmodule LoomkinWeb.WorkspaceLive do
           Loomkin.Teams.Agent.resume(pid)
         end)
 
-        Logger.debug("[WorkspaceLive] Resume requested for #{agent_name}")
-
       :error ->
-        Logger.warning("[WorkspaceLive] Cannot resume — agent #{agent_name} not found")
+        :ok
     end
 
     {:noreply, socket}
@@ -2185,10 +2197,6 @@ defmodule LoomkinWeb.WorkspaceLive do
                 :ok
 
               :error ->
-                Logger.warning(
-                  "[WorkspaceLive] Scheduled delivery failed — agent #{target} not found"
-                )
-
                 :error
             end
           else
@@ -2200,7 +2208,7 @@ defmodule LoomkinWeb.WorkspaceLive do
 
         flash =
           case delivery_result do
-            :ok -> {:info, "Scheduled message sent to #{target || "Team"}"}
+            :ok -> {:info, "Scheduled message sent to #{target || "Kin"}"}
             :error -> {:error, "Scheduled delivery failed — agent #{target} not found"}
           end
 
@@ -2213,7 +2221,8 @@ defmodule LoomkinWeb.WorkspaceLive do
 
   # Catch-all
   def handle_info(msg, socket) do
-    Logger.info("[WorkspaceLive] UNHANDLED message: #{inspect(msg, limit: 200)}")
+    require Logger
+    Logger.debug("[Kin:UI] unhandled msg=#{inspect(msg, limit: 100)}")
     {:noreply, socket}
   end
 
@@ -2557,6 +2566,9 @@ defmodule LoomkinWeb.WorkspaceLive do
               team_id={@active_team_id}
               queue_count={queue_count_for(@agent_queues, @focused_card.name)}
               scheduled_count={scheduled_count_for(@scheduled_messages, @focused_card.name)}
+              model={@focused_card[:model]}
+              budget_used={@focused_card[:budget_used] || 0}
+              budget_limit={@focused_card[:budget_limit] || 0}
             />
           </div>
         </div>
@@ -2569,6 +2581,9 @@ defmodule LoomkinWeb.WorkspaceLive do
             team_id={@active_team_id}
             queue_count={queue_count_for(@agent_queues, @concierge_card.name)}
             scheduled_count={scheduled_count_for(@scheduled_messages, @concierge_card.name)}
+            model={@concierge_card[:model]}
+            budget_used={@concierge_card[:budget_used] || 0}
+            budget_limit={@concierge_card[:budget_limit] || 0}
           />
         </div>
 
@@ -2579,7 +2594,7 @@ defmodule LoomkinWeb.WorkspaceLive do
               <svg class="w-3.5 h-3.5 text-muted" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M7 8a3 3 0 100-6 3 3 0 000 6zM14.5 9a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM1.615 16.428a1.224 1.224 0 01-.569-1.175 6.002 6.002 0 0111.908 0c.058.467-.172.92-.57 1.174A9.953 9.953 0 017 18a9.953 9.953 0 01-5.385-1.572zM14.5 16h-.106c.07-.297.088-.611.048-.933a7.47 7.47 0 00-1.588-3.755 4.502 4.502 0 015.874 2.636.818.818 0 01-.36.98A7.465 7.465 0 0114.5 16z" />
               </svg>
-              <span class="text-xs font-medium text-muted uppercase tracking-wider">Team</span>
+              <span class="text-xs font-medium text-muted uppercase tracking-wider">Kin</span>
             </div>
             <span
               class="text-[10px] tabular-nums px-1.5 py-0.5 rounded-full font-medium text-muted"
@@ -2614,6 +2629,9 @@ defmodule LoomkinWeb.WorkspaceLive do
                 team_id={@active_team_id}
                 queue_count={queue_count_for(@agent_queues, card.name)}
                 scheduled_count={scheduled_count_for(@scheduled_messages, card.name)}
+                model={card[:model]}
+                budget_used={card[:budget_used] || 0}
+                budget_limit={card[:budget_limit] || 0}
               />
             </div>
           <% end %>
@@ -2832,7 +2850,7 @@ defmodule LoomkinWeb.WorkspaceLive do
                 style="color: var(--text-primary);"
               >
                 <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-emerald-400" />
-                <span class="font-medium">Entire Team</span>
+                <span class="font-medium">Entire Kin</span>
               </button>
               <button
                 :for={agent <- @picker_agents}
@@ -3019,7 +3037,7 @@ defmodule LoomkinWeb.WorkspaceLive do
     |> Enum.map(fn msg ->
       {agent, from, to} =
         case msg.role do
-          :user -> {"You", "You", "Team"}
+          :user -> {"You", "You", "Kin"}
           :assistant -> {"concierge", "concierge", "You"}
         end
 
@@ -3073,7 +3091,7 @@ defmodule LoomkinWeb.WorkspaceLive do
   defp tab_label(:diff), do: "Diff"
   defp tab_label(:terminal), do: "Terminal"
   defp tab_label(:graph), do: "Graph"
-  defp tab_label(:team), do: "Team"
+  defp tab_label(:team), do: "Kin"
 
   defp render_tab(:files, assigns) do
     ~H"""
@@ -3288,7 +3306,8 @@ defmodule LoomkinWeb.WorkspaceLive do
     if MapSet.member?(subscribed, team_id) do
       socket
     else
-      Logger.info("[WorkspaceLive] subscribe_to_team(#{team_id}) self=#{inspect(self())}")
+      require Logger
+      Logger.info("[Kin:UI] subscribing to team=#{team_id}")
 
       # Subscribe to Jido Signal Bus for typed signals (new path)
       Loomkin.Signals.subscribe("agent.**")
@@ -3392,11 +3411,39 @@ defmodule LoomkinWeb.WorkspaceLive do
     end
   end
 
+  defp schedule_roster_refresh(socket) do
+    require Logger
+    Logger.debug("[Kin:UI] roster refresh scheduled (debounced #{@roster_debounce_ms}ms)")
+
+    if timer = socket.assigns[:roster_refresh_timer] do
+      Process.cancel_timer(timer)
+    end
+
+    timer = Process.send_after(self(), :debounced_roster_refresh, @roster_debounce_ms)
+    assign(socket, roster_refresh_timer: timer)
+  end
+
   defp refresh_roster(socket) do
+    require Logger
     team_id = socket.assigns[:active_team_id]
     agents = roster_agents(team_id)
     tasks = roster_tasks(team_id)
     budget = roster_budget(team_id)
+
+    agent_names = Enum.map(agents, & &1.name)
+
+    Logger.info(
+      "[Kin:UI] refresh_roster team=#{team_id} agents=#{inspect(agent_names)} count=#{length(agents)}"
+    )
+
+    # Subscribe to any sub-teams discovered during roster refresh so their
+    # signals (streaming, status, etc.) pass signal_for_workspace? filtering
+    sub_team_ids = if team_id, do: Loomkin.Teams.Manager.list_sub_teams(team_id), else: []
+
+    socket =
+      Enum.reduce(sub_team_ids, socket, fn sub_id, acc ->
+        subscribe_to_team(acc, sub_id)
+      end)
 
     assign(socket, cached_agents: agents, cached_tasks: tasks, cached_budget: budget)
   end
@@ -3404,10 +3451,6 @@ defmodule LoomkinWeb.WorkspaceLive do
   defp forward_to_activity(socket, pubsub_event) do
     case activity_event_from(pubsub_event) do
       nil ->
-        Logger.debug(
-          "[WorkspaceLive] forward_to_activity: DROPPED event=#{inspect(elem(pubsub_event, 0))}"
-        )
-
         socket
 
       :merge_tool_result ->
@@ -4001,6 +4044,20 @@ defmodule LoomkinWeb.WorkspaceLive do
 
   defp update_agent_card(socket, _, _), do: socket
 
+  defp update_card_budget(socket, agent_name, payload) do
+    cards = socket.assigns.agent_cards
+
+    case Map.get(cards, agent_name) do
+      nil ->
+        socket
+
+      card ->
+        total = (payload[:input_tokens] || 0) + (payload[:output_tokens] || 0)
+        updated = Map.update(card, :budget_used, total, &(&1 + total))
+        assign(socket, agent_cards: Map.put(cards, agent_name, updated))
+    end
+  end
+
   defp update_card_status(socket, agent_name, status) do
     # Clear stale :last_thinking content when agent goes idle or complete
     extra =
@@ -4052,14 +4109,26 @@ defmodule LoomkinWeb.WorkspaceLive do
       content_type: :idle,
       last_tool: nil,
       pending_question: nil,
+      model: nil,
+      budget_used: 0,
+      budget_limit: 0,
       updated_at: DateTime.utc_now()
     }
   end
 
   # Sync agent cards with roster data (status, role, task, team_id)
   defp sync_cards_with_roster(socket) do
+    require Logger
     agents = socket.assigns.cached_agents
     cards = socket.assigns.agent_cards
+
+    existing_names = Map.keys(cards)
+    incoming_names = Enum.map(agents, & &1.name)
+    new_names = incoming_names -- existing_names
+
+    if new_names != [] do
+      Logger.info("[Kin:UI] sync_cards NEW agents appearing: #{inspect(new_names)}")
+    end
 
     updated_cards =
       Enum.reduce(agents, cards, fn agent, acc ->
@@ -4070,10 +4139,15 @@ defmodule LoomkinWeb.WorkspaceLive do
           |> Map.put(:status, agent.status)
           |> Map.put(:role, agent.role)
           |> Map.put(:team_id, agent.team_id)
+          |> Map.put(:model, Map.get(agent, :model))
           |> Map.put(:current_task, Map.get(agent, :current_task) || card.current_task)
 
         Map.put(acc, agent.name, card)
       end)
+
+    Logger.debug(
+      "[Kin:UI] sync_cards total=#{map_size(updated_cards)} names=#{inspect(Map.keys(updated_cards))}"
+    )
 
     assign(socket, agent_cards: updated_cards)
   end
@@ -4191,6 +4265,8 @@ defmodule LoomkinWeb.WorkspaceLive do
   defp roster_agents(nil), do: []
 
   defp roster_agents(team_id) do
+    require Logger
+
     all_parent =
       case Loomkin.Teams.Manager.list_agents(team_id) do
         agents when is_list(agents) -> agents
@@ -4217,7 +4293,12 @@ defmodule LoomkinWeb.WorkspaceLive do
       end)
 
     result = parent_agents ++ child_agents
-    # Debug-level logging removed — roster_agents is now cached and called less frequently
+    sub_team_count = length(sub_teams)
+
+    Logger.info(
+      "[Kin:UI] roster_agents team=#{team_id} parent=#{length(parent_agents)} sub_teams=#{sub_team_count} child=#{length(child_agents)} total=#{length(result)}"
+    )
+
     result
   end
 
@@ -4412,7 +4493,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         send(pid, {:ask_user_answer, question_id, answer})
 
       [] ->
-        Logger.warning("[AskUser] No waiting process for question #{question_id}")
+        :ok
     end
   end
 
@@ -4518,7 +4599,7 @@ defmodule LoomkinWeb.WorkspaceLive do
         %{
           type: :sub_tab,
           label: Atom.to_string(tab),
-          detail: "Team Sub-tab",
+          detail: "Kin Sub-tab",
           value: Atom.to_string(tab)
         }
       end)
@@ -4700,8 +4781,7 @@ defmodule LoomkinWeb.WorkspaceLive do
     try do
       Loomkin.Channels.Bindings.list_bindings_for_team(team_id)
     rescue
-      e ->
-        Logger.warning("[WorkspaceLive] Failed to load channel bindings: #{Exception.message(e)}")
+      _e ->
         []
     end
   end

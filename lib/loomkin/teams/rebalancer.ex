@@ -8,8 +8,6 @@ defmodule Loomkin.Teams.Rebalancer do
 
   use GenServer
 
-  require Logger
-
   alias Loomkin.Teams.Comms
   alias Loomkin.Teams.Context
 
@@ -50,7 +48,6 @@ defmodule Loomkin.Teams.Rebalancer do
 
     schedule_check(check_interval)
 
-    Logger.info("[Rebalancer] Started for team #{team_id}")
     {:ok, state}
   end
 
@@ -165,20 +162,12 @@ defmodule Loomkin.Teams.Rebalancer do
 
       Comms.send_to(state.team_id, agent_name, {:peer_message, "rebalancer", nudge_msg})
 
-      Logger.info(
-        "[Rebalancer] Nudged #{agent_name} in team #{state.team_id} (#{idle_min}m idle, nudge #{nudge_count + 1})"
-      )
-
       put_in(state.nudge_counts[agent_name], nudge_count + 1)
     else
       current_task = find_agent_current_task(state.team_id, agent_name)
       task_info = if current_task, do: current_task.id, else: "unknown"
 
       Comms.broadcast(state.team_id, {:rebalance_needed, agent_name, task_info})
-
-      Logger.warning(
-        "[Rebalancer] Escalated #{agent_name} in team #{state.team_id} -- stuck #{idle_min}m on task #{task_info}"
-      )
 
       put_in(state.nudge_counts[agent_name], 0)
     end

@@ -18,8 +18,6 @@ defmodule Loomkin.MCP.Client do
 
   use GenServer
 
-  require Logger
-
   @sync_timeout 15_000
 
   defstruct endpoints: %{}, tools: %{}
@@ -167,10 +165,6 @@ defmodule Loomkin.MCP.Client do
     name = server_config[:name] || server_config["name"]
 
     unless name do
-      Logger.warning(
-        "[MCP Client] Server config missing :name, skipping: #{inspect(server_config)}"
-      )
-
       state
     else
       endpoint_id = {:mcp, name}
@@ -212,7 +206,6 @@ defmodule Loomkin.MCP.Client do
         {:stdio, command: command, args: args}
 
       true ->
-        Logger.warning("[MCP Client] No transport config found: #{inspect(config)}")
         {:stdio, command: "echo", args: ["no-op"]}
     end
   end
@@ -220,41 +213,22 @@ defmodule Loomkin.MCP.Client do
   defp sync_tools(endpoint_id, state) do
     case Jido.MCP.list_tools(endpoint_id) do
       {:ok, %{tools: tools}} when is_list(tools) ->
-        Logger.info("[MCP Client] Discovered #{length(tools)} tools from #{endpoint_id}")
-
         case build_proxy_modules(endpoint_id, tools) do
           {:ok, modules} ->
-            Logger.info(
-              "[MCP Client] Registered #{length(modules)} proxy tools from #{endpoint_id}"
-            )
-
             %{state | tools: Map.put(state.tools, endpoint_id, modules)}
 
-          {:error, reason} ->
-            Logger.warning(
-              "[MCP Client] Failed to build proxies for #{endpoint_id}: #{inspect(reason)}"
-            )
-
+          {:error, _reason} ->
             state
         end
 
       {:ok, _other} ->
-        Logger.info("[MCP Client] No tools found at #{endpoint_id}")
         state
 
-      {:error, reason} ->
-        Logger.warning(
-          "[MCP Client] Failed to list tools from #{endpoint_id}: #{inspect(reason)}"
-        )
-
+      {:error, _reason} ->
         state
     end
   rescue
-    e ->
-      Logger.warning(
-        "[MCP Client] Error syncing tools from #{endpoint_id}: #{Exception.message(e)}"
-      )
-
+    _e ->
       state
   end
 

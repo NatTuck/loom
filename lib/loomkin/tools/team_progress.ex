@@ -10,8 +10,6 @@ defmodule Loomkin.Tools.TeamProgress do
       team_id: [type: :string, required: true, doc: "Team ID"]
     ]
 
-  require Logger
-
   import Loomkin.Tool, only: [param!: 2]
 
   alias Loomkin.Teams.Context
@@ -86,8 +84,7 @@ defmodule Loomkin.Tools.TeamProgress do
   defp safe_list_agents(team_id) do
     Manager.list_agents(team_id)
   rescue
-    e ->
-      Logger.warning("list_agents failed for team #{team_id}: #{Exception.message(e)}")
+    _e ->
       :error
   end
 end

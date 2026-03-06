@@ -24,8 +24,6 @@ defmodule Loomkin.Auth.Providers.Anthropic do
 
   @behaviour Loomkin.Auth.Provider
 
-  require Logger
-
   # ── Constants (from anthropic-auth Rust crate) ─────────────────────
 
   # Default shared client ID (Claude CLI public client)
@@ -155,11 +153,9 @@ defmodule Loomkin.Auth.Providers.Anthropic do
         {:ok, token_data}
 
       {:ok, %Req.Response{status: status, body: resp_body}} ->
-        Logger.error("Anthropic token exchange failed (#{status}): #{inspect(resp_body)}")
         {:error, {:token_exchange_failed, status, resp_body}}
 
       {:error, reason} ->
-        Logger.error("Anthropic token exchange HTTP error: #{inspect(reason)}")
         {:error, {:http_error, reason}}
     end
   end
@@ -191,11 +187,9 @@ defmodule Loomkin.Auth.Providers.Anthropic do
         {:ok, token_data}
 
       {:ok, %Req.Response{status: status, body: resp_body}} ->
-        Logger.error("Anthropic token refresh failed (#{status}): #{inspect(resp_body)}")
         {:error, {:refresh_failed, status, resp_body}}
 
       {:error, reason} ->
-        Logger.error("Anthropic token refresh HTTP error: #{inspect(reason)}")
         {:error, {:http_error, reason}}
     end
   end
@@ -238,11 +232,6 @@ defmodule Loomkin.Auth.Providers.Anthropic do
         if returned_state == expected_state do
           {:ok, code, returned_state}
         else
-          Logger.warning(
-            "Anthropic OAuth state mismatch — expected #{String.slice(expected_state, 0..7)}..., " <>
-              "got #{String.slice(returned_state, 0..7)}..."
-          )
-
           {:error, :state_mismatch}
         end
 
@@ -272,16 +261,13 @@ defmodule Loomkin.Auth.Providers.Anthropic do
       {:ok, %Req.Response{status: 200, body: %{"raw_key" => key}}} when key != "" ->
         {:ok, key}
 
-      {:ok, %Req.Response{status: 200, body: resp_body}} ->
-        Logger.error("Anthropic API key creation returned empty key: #{inspect(resp_body)}")
+      {:ok, %Req.Response{status: 200, body: _resp_body}} ->
         {:error, :empty_api_key}
 
       {:ok, %Req.Response{status: status, body: resp_body}} ->
-        Logger.error("Anthropic API key creation failed (#{status}): #{inspect(resp_body)}")
         {:error, {:api_key_failed, status, resp_body}}
 
       {:error, reason} ->
-        Logger.error("Anthropic API key creation HTTP error: #{inspect(reason)}")
         {:error, {:http_error, reason}}
     end
   end

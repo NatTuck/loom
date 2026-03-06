@@ -9,8 +9,6 @@ defmodule Loomkin.RepoIntel.Watcher do
 
   use GenServer
 
-  require Logger
-
   @debounce_ms 200
 
   @skip_dirs ~w(.git _build deps node_modules .loomkin .elixir_ls)
@@ -101,7 +99,6 @@ defmodule Loomkin.RepoIntel.Watcher do
 
   @impl true
   def handle_info({:file_event, _watcher_pid, :stop}, state) do
-    Logger.info("File watcher stopped")
     {:noreply, %{state | watcher_pid: nil}}
   end
 
@@ -153,8 +150,6 @@ defmodule Loomkin.RepoIntel.Watcher do
       {:ok, watcher_pid} ->
         FileSystem.subscribe(watcher_pid)
 
-        Logger.info("File watcher started for #{project_path}")
-
         %{
           state
           | project_path: project_path,
@@ -162,12 +157,10 @@ defmodule Loomkin.RepoIntel.Watcher do
             gitignore_patterns: gitignore_patterns
         }
 
-      {:error, reason} ->
-        Logger.warning("Failed to start file watcher: #{inspect(reason)}")
+      {:error, _reason} ->
         %{state | project_path: project_path, gitignore_patterns: gitignore_patterns}
 
       :ignore ->
-        Logger.warning("File watcher not available (missing inotifywait/fswatch?)")
         %{state | project_path: project_path, gitignore_patterns: gitignore_patterns}
     end
   end
@@ -245,7 +238,7 @@ defmodule Loomkin.RepoIntel.Watcher do
     end
   catch
     :no_index ->
-      Logger.debug("RepoIntel.Index not running, skipping change processing")
+      :ok
   end
 
   # --- Gitignore parsing ---

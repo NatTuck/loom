@@ -16,8 +16,6 @@ defmodule Loomkin.Teams.Migration do
   alias Loomkin.Teams.Distributed
   alias Loomkin.Teams.Manager
 
-  require Logger
-
   @doc """
   Migrate an agent from the current node to a target node.
 
@@ -90,18 +88,8 @@ defmodule Loomkin.Teams.Migration do
 
   defp do_migrate(team_id, agent_name, target_node) do
     with {:ok, state} <- serialize_agent_state(team_id, agent_name),
-         :ok <- stop_agent_on_source(team_id, agent_name),
-         {:ok, pid} <- start_agent_on_target(state, target_node) do
-      Logger.info("[Migration] Migrated #{agent_name} from #{Node.self()} to #{target_node}")
-
-      {:ok, pid}
-    else
-      {:error, reason} = err ->
-        Logger.error(
-          "[Migration] Failed to migrate #{agent_name} to #{target_node}: #{inspect(reason)}"
-        )
-
-        err
+         :ok <- stop_agent_on_source(team_id, agent_name) do
+      start_agent_on_target(state, target_node)
     end
   end
 

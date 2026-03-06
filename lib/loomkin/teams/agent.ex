@@ -22,8 +22,6 @@ defmodule Loomkin.Teams.Agent do
   alias Loomkin.Teams.RateLimiter
   alias Loomkin.Teams.Role
 
-  require Logger
-
   defstruct [
     :team_id,
     :name,
@@ -57,7 +55,8 @@ defmodule Loomkin.Teams.Agent do
     GenServer.start_link(__MODULE__, opts,
       name:
         {:via, Registry,
-         {Loomkin.Teams.AgentRegistry, {team_id, name}, %{role: opts[:role], status: :idle}}}
+         {Loomkin.Teams.AgentRegistry, {team_id, name},
+          %{role: opts[:role], status: :idle, model: opts[:model]}}}
     )
   end
 
@@ -170,14 +169,18 @@ defmodule Loomkin.Teams.Agent do
 
   @impl true
   def init(opts) do
+    require Logger
     team_id = Keyword.fetch!(opts, :team_id)
     name = Keyword.fetch!(opts, :name)
     role = Keyword.fetch!(opts, :role)
     project_path = Keyword.get(opts, :project_path)
 
     permission_mode = Keyword.get(opts, :permission_mode, :auto)
+    kin_agents = Keyword.get(opts, :kin_agents, [])
 
-    case Role.get(role) do
+    Logger.info("[Kin:agent] init name=#{name} role=#{role} team=#{team_id}")
+
+    case Role.get(role, kin_agents: kin_agents) do
       {:ok, role_config} ->
         model = Keyword.get(opts, :model) || ModelRouter.default_model()
 
@@ -197,6 +200,7 @@ defmodule Loomkin.Teams.Agent do
 
         Context.register_agent(team_id, name, %{role: role, status: :idle, model: model})
         broadcast_team(state, {:agent_status, state.name, :idle})
+        Logger.info("[Kin:agent] registered name=#{name} role=#{role} — broadcasting :idle")
 
         if role == :orienter do
           {:ok, state, {:continue, :auto_orient}}
@@ -205,12 +209,15 @@ defmodule Loomkin.Teams.Agent do
         end
 
       {:error, :unknown_role} ->
+        Logger.error("[Kin:agent] UNKNOWN ROLE #{inspect(role)} for #{name}")
         {:stop, {:unknown_role, role}}
     end
   end
 
   @impl true
   def handle_continue(:auto_orient, state) do
+    require Logger
+    Logger.info("[Kin:agent] orienter auto-orient starting team=#{state.team_id}")
     state = set_status(state, :working)
     broadcast_team(state, {:agent_status, state.name, :working})
 
@@ -245,6 +252,12 @@ defmodule Loomkin.Teams.Agent do
 
   @impl true
   def handle_call({:send_message, text}, from, state) do
+    require Logger
+
+    Logger.info(
+      "[Kin:agent] #{state.name} received message, loop_active=#{state.loop_task != nil}"
+    )
+
     state = set_status(state, :working)
 
     user_message = %{role: :user, content: text}
@@ -301,7 +314,6 @@ defmodule Loomkin.Teams.Agent do
   def handle_call(:cancel, _from, state) do
     case state.loop_task do
       {%Task{} = task, original_from} ->
-        Logger.info("[Agent:#{state.name}] Cancelling agent loop")
         Task.shutdown(task, :brutal_kill)
         task_id = state.task && state.task[:id]
         if original_from, do: GenServer.reply(original_from, {:error, :cancelled})
@@ -321,7 +333,6 @@ defmodule Loomkin.Teams.Agent do
 
       nil when state.pending_permission != nil ->
         # Agent is waiting on permission — clear it and go idle
-        Logger.info("[Agent:#{state.name}] Cancelling pending permission")
         state = %{state | pending_permission: nil, pending_updates: [], priority_queue: []}
         state = set_status(state, :idle)
         broadcast_team(state, {:agent_status, state.name, :idle})
@@ -329,8 +340,6 @@ defmodule Loomkin.Teams.Agent do
 
       nil when state.status == :paused ->
         # Agent is paused — cancel clears paused state
-        Logger.info("[Agent:#{state.name}] Cancelling paused agent")
-
         state = %{
           state
           | paused_state: nil,
@@ -544,8 +553,6 @@ defmodule Loomkin.Teams.Agent do
   end
 
   def handle_call({:resume, opts}, _from, %{status: :paused} = state) do
-    Logger.info("[Agent:#{state.name}] Resuming from pause")
-
     paused = state.paused_state
     messages = paused.messages
 
@@ -556,7 +563,6 @@ defmodule Loomkin.Teams.Agent do
           messages
 
         guidance when is_binary(guidance) ->
-          Logger.info("[Agent:#{state.name}] Steering with: #{String.slice(guidance, 0, 100)}")
           messages ++ [%{role: :user, content: "[User Guidance]: #{guidance}"}]
       end
 
@@ -585,13 +591,11 @@ defmodule Loomkin.Teams.Agent do
 
   @impl true
   def handle_cast(:request_pause, state) do
-    Logger.info("[Agent:#{state.name}] Pause requested")
     {:noreply, %{state | pause_requested: true}}
   end
 
   @impl true
   def handle_cast({:assign_task, task}, state) do
-    Logger.info("[Agent:#{state.name}] Assigned task: #{inspect(task[:id] || task)}")
     # Only override model if the task has an explicit model_hint;
     # otherwise preserve the agent's current model (set at spawn from user's selection)
     model = if task[:model_hint], do: ModelRouter.select(state.role, task), else: state.model
@@ -604,7 +608,6 @@ defmodule Loomkin.Teams.Agent do
 
   @impl true
   def handle_cast({:update_project_path, new_path}, state) do
-    Logger.debug("[Agent:#{state.name}] Updated project_path to #{new_path}")
     {:noreply, %{state | project_path: new_path}}
   end
 
@@ -732,7 +735,6 @@ defmodule Loomkin.Teams.Agent do
 
     case state.loop_task do
       {%Task{ref: ^ref}, from} ->
-        Logger.error("[Agent:#{state.name}] Loop failed: #{inspect(reason)}")
         task_id = state.task && state.task[:id]
 
         state = %{state | messages: msgs, loop_task: nil}
@@ -777,8 +779,6 @@ defmodule Loomkin.Teams.Agent do
 
     case state.loop_task do
       {%Task{ref: ^ref}, from} ->
-        Logger.info("[Agent:#{state.name}] Loop paused: #{inspect(reason)}")
-
         paused_state = %{
           messages: msgs,
           iteration: iteration,
@@ -809,7 +809,6 @@ defmodule Loomkin.Teams.Agent do
   def handle_info({:DOWN, ref, :process, _pid, reason}, state) when is_reference(ref) do
     case state.loop_task do
       {%Task{ref: ^ref}, from} ->
-        Logger.error("[Agent:#{state.name}] Loop task crashed: #{inspect(reason)}")
         task_id = state.task && state.task[:id]
 
         state = %{state | loop_task: nil}
@@ -1002,11 +1001,7 @@ defmodule Loomkin.Teams.Agent do
   end
 
   @impl true
-  def handle_info({:agent_status, agent_name, status}, state) do
-    if agent_name != state.name do
-      Logger.debug("[Agent:#{state.name}] Peer #{agent_name} status: #{status}")
-    end
-
+  def handle_info({:agent_status, _agent_name, _status}, state) do
     {:noreply, state}
   end
 
@@ -1034,8 +1029,6 @@ defmodule Loomkin.Teams.Agent do
   @impl true
   def handle_info({:task_assigned, task_id, agent_name}, state) do
     if to_string(agent_name) == to_string(state.name) do
-      Logger.info("[Agent:#{state.name}] Received task assignment: #{task_id}")
-
       case Loomkin.Teams.Tasks.get_task(task_id) do
         {:ok, task} ->
           # Only override model if the task has an explicit model_hint;
@@ -1061,11 +1054,9 @@ defmodule Loomkin.Teams.Agent do
           {:noreply, state}
 
         {:error, _} ->
-          Logger.warning("[Agent:#{state.name}] Could not fetch task #{task_id}")
           {:noreply, state}
       end
     else
-      Logger.debug("[Agent:#{state.name}] Task #{task_id} assigned to #{agent_name}")
       {:noreply, state}
     end
   end
@@ -1073,15 +1064,10 @@ defmodule Loomkin.Teams.Agent do
   @impl true
   def handle_info({:auto_execute_task, task_id}, state) do
     if state.status != :idle || state.loop_task != nil do
-      Logger.debug(
-        "[Agent:#{state.name}] Skipping auto-execute for #{task_id} — status is #{state.status}"
-      )
-
       {:noreply, state}
     else
       task = state.task
       description = task[:description] || task[:title] || "Complete task #{task_id}"
-      Logger.info("[Agent:#{state.name}] Auto-executing task #{task_id}")
 
       state = set_status(state, :working)
       broadcast_team(state, {:agent_status, state.name, :working})
@@ -1177,8 +1163,7 @@ defmodule Loomkin.Teams.Agent do
             ""
         end
       rescue
-        e ->
-          Logger.warning("[Agent] Failed to format sub-team results: #{Exception.message(e)}")
+        _ ->
           ""
       end
 
@@ -1193,13 +1178,7 @@ defmodule Loomkin.Teams.Agent do
   end
 
   @impl true
-  def handle_info({:role_changed, agent_name, old_role, new_role}, state) do
-    if agent_name != state.name do
-      Logger.debug(
-        "[Agent:#{state.name}] Peer #{agent_name} changed role: #{old_role} -> #{new_role}"
-      )
-    end
-
+  def handle_info({:role_changed, _agent_name, _old_role, _new_role}, state) do
     {:noreply, state}
   end
 
@@ -1338,8 +1317,7 @@ defmodule Loomkin.Teams.Agent do
   end
 
   @impl true
-  def handle_info({:loop_resumed, {:error, reason, messages}}, state) do
-    Logger.error("[Agent:#{state.name}] Resumed loop failed: #{inspect(reason)}")
+  def handle_info({:loop_resumed, {:error, _reason, messages}}, state) do
     state = %{state | messages: messages}
     state = set_status(state, :idle)
     broadcast_team(state, {:agent_status, state.name, :idle})
@@ -1394,8 +1372,6 @@ defmodule Loomkin.Teams.Agent do
 
   @impl true
   def handle_info({:tasks_unblocked, task_ids}, state) do
-    Logger.debug("[Agent:#{state.name}] Tasks unblocked: #{inspect(task_ids)}")
-
     msg = %{
       role: :system,
       content:
@@ -1406,11 +1382,7 @@ defmodule Loomkin.Teams.Agent do
   end
 
   @impl true
-  def handle_info({:role_change_request, agent_name, old_role, new_role, _request_id}, state) do
-    Logger.debug(
-      "[Agent:#{state.name}] Role change request: #{agent_name} #{old_role} -> #{new_role}"
-    )
-
+  def handle_info({:role_change_request, _agent_name, _old_role, _new_role, _request_id}, state) do
     {:noreply, state}
   end
 
@@ -1491,7 +1463,7 @@ defmodule Loomkin.Teams.Agent do
 
         # Update Registry metadata
         Registry.update_value(Loomkin.Teams.AgentRegistry, {state.team_id, state.name}, fn _old ->
-          %{role: new_role, status: state.status}
+          %{role: new_role, status: state.status, model: state.model}
         end)
 
         # Update Context agent info
@@ -1506,8 +1478,6 @@ defmodule Loomkin.Teams.Agent do
 
         # Broadcast role change to team
         broadcast_team(state, {:role_changed, state.name, old_role, new_role})
-
-        Logger.info("[Agent:#{state.name}] Role changed from #{old_role} to #{new_role}")
 
         {:reply, :ok, state}
 
@@ -1526,8 +1496,7 @@ defmodule Loomkin.Teams.Agent do
       metadata: %{"team_id" => team_id}
     })
   rescue
-    e ->
-      Logger.debug("[Agent] Graph role-change log failed: #{Exception.message(e)}")
+    _ ->
       :ok
   end
 
@@ -1642,8 +1611,6 @@ defmodule Loomkin.Teams.Agent do
 
     case ModelRouter.escalate(old_model) do
       {:ok, next_model} ->
-        Logger.info("[Agent:#{snapshot.name}] Escalating from #{old_model} to #{next_model}")
-
         CostTracker.record_escalation(
           snapshot.team_id,
           to_string(snapshot.name),
@@ -1749,8 +1716,7 @@ defmodule Loomkin.Teams.Agent do
     )
     |> Loomkin.Signals.publish()
   rescue
-    e ->
-      Logger.debug("[Agent] Queue update signal failed: #{Exception.message(e)}")
+    _ ->
       :ok
   end
 
@@ -1836,8 +1802,7 @@ defmodule Loomkin.Teams.Agent do
     {:noreply, state}
   end
 
-  defp handle_urgent(msg, state) do
-    Logger.warning("[Agent:#{state.name}] Unhandled urgent message: #{inspect(msg)}")
+  defp handle_urgent(_msg, state) do
     {:noreply, state}
   end
 
@@ -2012,8 +1977,7 @@ defmodule Loomkin.Teams.Agent do
       end
     end
   rescue
-    e ->
-      Logger.warning("[Agent] Context window management failed: #{Exception.message(e)}")
+    _ ->
       state.messages
   end
 
@@ -2039,10 +2003,6 @@ defmodule Loomkin.Teams.Agent do
   end
 
   defp handle_loop_event(team_id, agent_name, event_name, payload) do
-    if event_name in [:tool_executing, :tool_complete] do
-      Logger.info("[Agent:#{agent_name}] Emitting #{event_name} signal for team=#{team_id}")
-    end
-
     agent_str = to_string(agent_name)
 
     signal =
@@ -2141,8 +2101,7 @@ defmodule Loomkin.Teams.Agent do
       |> Loomkin.Signals.publish()
     end
   rescue
-    e ->
-      Logger.debug("[Agent] Signal publish failed: #{Exception.message(e)}")
+    _ ->
       :ok
   end
 
@@ -2154,8 +2113,8 @@ defmodule Loomkin.Teams.Agent do
            tokens: total_tokens,
            cost: cost
          }) do
-      {:budget_exceeded, scope} ->
-        Logger.warning("[Agent:#{state.name}] Budget exceeded (#{scope})")
+      {:budget_exceeded, _scope} ->
+        :ok
 
       :ok ->
         :ok
@@ -2210,7 +2169,7 @@ defmodule Loomkin.Teams.Agent do
 
   defp set_status(state, new_status) do
     Registry.update_value(Loomkin.Teams.AgentRegistry, {state.team_id, state.name}, fn _old ->
-      %{role: state.role, status: new_status}
+      %{role: state.role, status: new_status, model: state.model}
     end)
 
     Context.update_agent_status(state.team_id, state.name, new_status)
@@ -2306,8 +2265,7 @@ defmodule Loomkin.Teams.Agent do
     )
     |> Loomkin.Signals.publish()
   rescue
-    e ->
-      Logger.debug("[Agent] Signal publish failed: #{Exception.message(e)}")
+    _ ->
       :ok
   end
 
@@ -2324,8 +2282,7 @@ defmodule Loomkin.Teams.Agent do
     )
     |> Loomkin.Signals.publish()
   rescue
-    e ->
-      Logger.debug("[Agent] Signal publish failed: #{Exception.message(e)}")
+    _ ->
       :ok
   end
 end

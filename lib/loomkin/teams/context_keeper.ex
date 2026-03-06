@@ -14,8 +14,6 @@ defmodule Loomkin.Teams.ContextKeeper do
   alias Loomkin.Repo
   alias Loomkin.Schemas.ContextKeeper, as: KeeperSchema
 
-  require Logger
-
   @chars_per_token 4
   @keyword_match_budget 10_000
   @persist_debounce_ms 50
@@ -123,8 +121,7 @@ defmodule Loomkin.Teams.ContextKeeper do
       end
     end)
   rescue
-    e ->
-      Logger.warning("[ContextKeeper] rehydrate_from_db failed: #{Exception.message(e)}")
+    _ ->
       :ok
   end
 
@@ -284,19 +281,11 @@ defmodule Loomkin.Teams.ContextKeeper do
             {:ok, _} ->
               %{state | dirty: false}
 
-            {:error, reason} ->
-              Logger.warning(
-                "[ContextKeeper:#{state.id}] Persist failed: #{inspect(reason)}, will retry"
-              )
-
+            {:error, _reason} ->
               schedule_persist(state)
           end
         rescue
-          e ->
-            Logger.warning(
-              "[ContextKeeper:#{state.id}] Persist raised: #{Exception.message(e)}, will retry"
-            )
-
+          _ ->
             schedule_persist(state)
         end
       else
@@ -316,16 +305,12 @@ defmodule Loomkin.Teams.ContextKeeper do
           {:ok, _} ->
             :ok
 
-          {:error, reason} ->
-            Logger.error(
-              "[ContextKeeper:#{state.id}] Final persist failed on terminate: #{inspect(reason)}"
-            )
+          {:error, _reason} ->
+            :ok
         end
       rescue
-        e ->
-          Logger.error(
-            "[ContextKeeper:#{state.id}] Final persist raised on terminate: #{Exception.message(e)}"
-          )
+        _ ->
+          :ok
       end
     end
 
@@ -353,11 +338,7 @@ defmodule Loomkin.Teams.ContextKeeper do
         state
     end
   rescue
-    e in DBConnection.OwnershipError ->
-      Logger.debug(
-        "[ContextKeeper:#{state.id}] DB not available during init: #{inspect(e.__struct__)}"
-      )
-
+    _e in DBConnection.OwnershipError ->
       state
   end
 
@@ -409,8 +390,8 @@ defmodule Loomkin.Teams.ContextKeeper do
       end
     )
   rescue
-    e ->
-      Logger.warning("[ContextKeeper] Registry token update failed: #{Exception.message(e)}")
+    _ ->
+      :ok
   end
 
   defp keyword_match(messages, query) do

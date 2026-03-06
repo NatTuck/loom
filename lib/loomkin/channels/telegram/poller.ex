@@ -15,8 +15,6 @@ defmodule Loomkin.Channels.Telegram.Poller do
 
   use GenServer
 
-  require Logger
-
   alias Loomkin.Channels.Router, as: ChannelRouter
 
   @poll_timeout 30
@@ -32,7 +30,6 @@ defmodule Loomkin.Channels.Telegram.Poller do
 
   @impl true
   def init(_opts) do
-    Logger.info("[Telegram.Poller] Starting long-polling mode")
     send(self(), :poll)
     {:ok, %{offset: 0}}
   end
@@ -47,15 +44,10 @@ defmodule Loomkin.Channels.Telegram.Poller do
 
       {:ok, _} ->
         # Unexpected response shape — retry after delay
-        Logger.warning("[Telegram.Poller] Unexpected get_updates response, retrying")
         Process.send_after(self(), :poll, @retry_delay_ms)
         {:noreply, state}
 
-      {:error, reason} ->
-        Logger.error(
-          "[Telegram.Poller] get_updates error: #{inspect(reason)}, retrying in #{@retry_delay_ms}ms"
-        )
-
+      {:error, _reason} ->
         Process.send_after(self(), :poll, @retry_delay_ms)
         {:noreply, state}
     end
@@ -87,13 +79,13 @@ defmodule Loomkin.Channels.Telegram.Poller do
             :ok
 
           {:error, :no_binding} ->
-            Logger.debug("[Telegram.Poller] No binding for chat #{channel_id_str}")
+            :ok
 
-          {:error, reason} ->
-            Logger.error("[Telegram.Poller] Error handling update: #{inspect(reason)}")
+          {:error, _reason} ->
+            :ok
         end
       else
-        Logger.debug("[Telegram.Poller] Update without chat_id, ignoring")
+        :ok
       end
     end)
 

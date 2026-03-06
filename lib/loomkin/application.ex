@@ -104,12 +104,8 @@ defmodule Loomkin.Application do
         try do
           module.register!()
         rescue
-          e ->
-            require Logger
-
-            Logger.warning(
-              "Failed to register OAuth provider #{inspect(module)}: #{Exception.message(e)}"
-            )
+          _e ->
+            :ok
         end
       end
     end

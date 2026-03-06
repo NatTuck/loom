@@ -10,8 +10,6 @@ defmodule Loomkin.Teams.Manager do
   alias Loomkin.Teams.Rebalancer
   alias Loomkin.Teams.TableRegistry
 
-  require Logger
-
   @default_max_nesting_depth 2
 
   @doc """
@@ -47,7 +45,6 @@ defmodule Loomkin.Teams.Manager do
     # Start decision graph nervous system processes
     start_nervous_system(team_id)
 
-    Logger.info("[Teams] Created team #{name} (#{team_id})")
     {:ok, team_id}
   end
 
@@ -98,7 +95,6 @@ defmodule Loomkin.Teams.Manager do
           # Start decision graph nervous system processes
           start_nervous_system(sub_team_id)
 
-          Logger.info("[Teams] Created sub-team #{name} (#{sub_team_id}) under #{parent_team_id}")
           {:ok, sub_team_id}
         end
 
@@ -156,6 +152,8 @@ defmodule Loomkin.Teams.Manager do
   Starts a Teams.Agent GenServer under the AgentSupervisor.
   """
   def spawn_agent(team_id, name, role, opts \\ []) do
+    require Logger
+
     child_opts = [
       team_id: team_id,
       name: name,
@@ -169,7 +167,24 @@ defmodule Loomkin.Teams.Manager do
         do: Keyword.put(child_opts, :permission_mode, opts[:permission_mode]),
         else: child_opts
 
-    Distributed.start_child({Loomkin.Teams.Agent, child_opts})
+    child_opts =
+      if opts[:kin_agents],
+        do: Keyword.put(child_opts, :kin_agents, opts[:kin_agents]),
+        else: child_opts
+
+    result = Distributed.start_child({Loomkin.Teams.Agent, child_opts})
+
+    case result do
+      {:ok, pid} ->
+        Logger.info("[Kin:spawn] agent=#{name} role=#{role} team=#{team_id} pid=#{inspect(pid)}")
+
+      {:error, reason} ->
+        Logger.error(
+          "[Kin:spawn] FAILED agent=#{name} role=#{role} team=#{team_id} reason=#{inspect(reason)}"
+        )
+    end
+
+    result
   end
 
   @doc """
@@ -268,21 +283,45 @@ defmodule Loomkin.Teams.Manager do
 
   @doc "List all agents in a team (excludes keepers and other non-agent entries)."
   def list_agents(team_id) do
-    Registry.select(Loomkin.Teams.AgentRegistry, [
-      {{{team_id, :"$1"}, :"$2", :"$3"}, [], [%{name: :"$1", pid: :"$2", meta: :"$3"}]}
-    ])
-    |> Enum.filter(fn %{meta: meta} ->
-      is_map(meta) and meta[:type] != :keeper and
-        (Map.has_key?(meta, :role) or Map.has_key?(meta, "role"))
-    end)
-    |> Enum.map(fn %{name: name, pid: pid, meta: meta} ->
-      %{
-        name: name,
-        pid: pid,
-        role: meta[:role] || meta["role"],
-        status: meta[:status] || meta["status"] || :idle
-      }
-    end)
+    require Logger
+
+    raw =
+      Registry.select(Loomkin.Teams.AgentRegistry, [
+        {{{team_id, :"$1"}, :"$2", :"$3"}, [], [%{name: :"$1", pid: :"$2", meta: :"$3"}]}
+      ])
+
+    filtered =
+      Enum.filter(raw, fn %{meta: meta} ->
+        is_map(meta) and meta[:type] != :keeper and
+          (Map.has_key?(meta, :role) or Map.has_key?(meta, "role"))
+      end)
+
+    dropped = length(raw) - length(filtered)
+
+    if dropped > 0 do
+      dropped_names = Enum.map(raw -- filtered, & &1.name)
+
+      Logger.warning(
+        "[Kin:roster] team=#{team_id} dropped #{dropped} entries: #{inspect(dropped_names)} (no :role in metadata)"
+      )
+    end
+
+    agents =
+      Enum.map(filtered, fn %{name: name, pid: pid, meta: meta} ->
+        %{
+          name: name,
+          pid: pid,
+          role: meta[:role] || meta["role"],
+          status: meta[:status] || meta["status"] || :idle,
+          model: meta[:model] || meta["model"]
+        }
+      end)
+
+    Logger.debug(
+      "[Kin:roster] team=#{team_id} found #{length(agents)} agents: #{inspect(Enum.map(agents, & &1.name))}"
+    )
+
+    agents
   end
 
   @doc "List all agents in a team and its sub-teams recursively."
@@ -346,7 +385,6 @@ defmodule Loomkin.Teams.Manager do
     signal = Loomkin.Signals.Team.Dissolved.new!(%{team_id: team_id})
     Loomkin.Signals.publish(signal)
 
-    Logger.info("[Teams] Dissolved team #{team_id}")
     :ok
   end
 

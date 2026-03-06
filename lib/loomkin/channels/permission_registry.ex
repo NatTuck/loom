@@ -10,8 +10,6 @@ defmodule Loomkin.Channels.PermissionRegistry do
 
   use GenServer
 
-  require Logger
-
   @table :channel_permission_requests
   @expiry_ms 10 * 60 * 1000
   @cleanup_interval_ms 60 * 1000
@@ -45,10 +43,6 @@ defmodule Loomkin.Channels.PermissionRegistry do
       agent_pid_or_ref,
       now
     })
-
-    Logger.info(
-      "[PermissionRegistry] Registered #{request_id}: #{agent_name} wants #{tool_name} on #{tool_path}"
-    )
 
     request_id
   end
@@ -109,18 +103,10 @@ defmodule Loomkin.Channels.PermissionRegistry do
               Loomkin.Teams.Agent.permission_response(pid, full_action, tool_name, tool_path)
               :ets.delete(@table, request_id)
 
-              Logger.info(
-                "[PermissionRegistry] Resolved #{request_id}: #{full_action} for #{agent_name}"
-              )
-
               :ok
 
             [] ->
               :ets.delete(@table, request_id)
-
-              Logger.warning(
-                "[PermissionRegistry] Agent #{agent_name} not found for request #{request_id}"
-              )
 
               {:error, :not_found}
           end

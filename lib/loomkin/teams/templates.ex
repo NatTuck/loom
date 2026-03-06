@@ -8,8 +8,6 @@ defmodule Loomkin.Teams.Templates do
 
   alias Loomkin.Teams.Manager
 
-  require Logger
-
   defstruct [:name, :agents]
 
   @type agent_config :: %{
@@ -104,7 +102,6 @@ defmodule Loomkin.Teams.Templates do
             end
           end)
 
-        Logger.info("[Templates] Spawned team #{team_name} from template #{template_name}")
         {:ok, team_id, results}
 
       {:error, :not_found} ->

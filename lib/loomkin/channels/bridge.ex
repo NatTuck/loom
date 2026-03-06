@@ -10,8 +10,6 @@ defmodule Loomkin.Channels.Bridge do
 
   use GenServer
 
-  require Logger
-
   alias Loomkin.Channels.Severity
 
   # Rate limit: max messages per window
@@ -94,10 +92,6 @@ defmodule Loomkin.Channels.Bridge do
         MapSet.new()
       end
 
-    Logger.info(
-      "[Bridge] Started for #{binding.channel}:#{binding.channel_id} -> team:#{binding.team_id}"
-    )
-
     {:ok,
      %__MODULE__{
        binding: binding,
@@ -135,7 +129,6 @@ defmodule Loomkin.Channels.Bridge do
           {:noreply, %{new_state | pending_questions: pending}}
 
         {:rate_limited, new_state} ->
-          Logger.warning("[Bridge] Rate limited, dropping ask_user for #{question_id}")
           {:noreply, new_state}
       end
     else
@@ -426,8 +419,6 @@ defmodule Loomkin.Channels.Bridge do
     if MapSet.member?(state.subscribed_sessions, session_id) do
       {:noreply, state}
     else
-      Logger.info("[Bridge] Tracking session:#{session_id}")
-
       {:noreply,
        %{state | subscribed_sessions: MapSet.put(state.subscribed_sessions, session_id)}}
     end
@@ -454,7 +445,7 @@ defmodule Loomkin.Channels.Bridge do
         Loomkin.Teams.Agent.send_message(pid, text)
 
       [] ->
-        Logger.warning("[Bridge] No lead agent found for team #{team_id}, message dropped")
+        :ok
     end
 
     {:noreply, state}
@@ -463,7 +454,6 @@ defmodule Loomkin.Channels.Bridge do
   defp handle_inbound_callback(question_id, answer, state) do
     case Map.pop(state.pending_questions, question_id) do
       {nil, _} ->
-        Logger.warning("[Bridge] Received callback for unknown question #{question_id}")
         {:noreply, state}
 
       {_meta, remaining} ->
@@ -472,7 +462,7 @@ defmodule Loomkin.Channels.Bridge do
             send(pid, {:ask_user_answer, question_id, answer})
 
           [] ->
-            Logger.warning("[Bridge] No waiting agent for question #{question_id}")
+            :ok
         end
 
         {:noreply, %{state | pending_questions: remaining}}
@@ -504,8 +494,7 @@ defmodule Loomkin.Channels.Bridge do
         :ok ->
           {:ok, %{state | rate_limiter: {count + 1, window_start}}}
 
-        {:error, reason} ->
-          Logger.error("[Bridge] Adapter send failed: #{inspect(reason)}")
+        {:error, _reason} ->
           {:ok, %{state | rate_limiter: {count + 1, window_start}}}
       end
     end

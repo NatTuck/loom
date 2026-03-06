@@ -179,7 +179,7 @@ defmodule LoomkinWeb.TeamDashboardComponent do
       <%!-- Header --%>
       <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-sm font-semibold text-violet-400">Team: {@team_id}</span>
+          <span class="text-sm font-semibold text-violet-400">Kin: {@team_id}</span>
         </div>
         <span class="text-xs text-gray-500">{length(@agents)} agents</span>
       </div>
@@ -192,7 +192,7 @@ defmodule LoomkinWeb.TeamDashboardComponent do
           </div>
           <div class="divide-y divide-gray-800/50">
             <div :if={@agents == []} class="px-3 py-4 text-center text-xs text-gray-600">
-              No agents spawned
+              No kin spawned
             </div>
             <div
               :for={agent <- @agents}

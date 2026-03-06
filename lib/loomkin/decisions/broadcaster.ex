@@ -3,8 +3,6 @@ defmodule Loomkin.Decisions.Broadcaster do
 
   use GenServer
 
-  require Logger
-
   alias Loomkin.Decisions.Graph
   alias Loomkin.Teams.Comms
 
@@ -34,7 +32,6 @@ defmodule Loomkin.Decisions.Broadcaster do
       recent_notifications: %{}
     }
 
-    Logger.info("[Broadcaster] Started for team #{team_id}")
     {:ok, state}
   end
 
@@ -98,10 +95,6 @@ defmodule Loomkin.Decisions.Broadcaster do
         }
 
         Comms.send_to(acc.team_id, agent_name, {:discovery_relevant, payload})
-
-        Logger.debug(
-          "[Broadcaster] Notified #{agent_name} about #{node.node_type} #{node.id} -> goal #{goal.id}"
-        )
 
         mark_notified(acc, goal.id, agent_name, now)
       else

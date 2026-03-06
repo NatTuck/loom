@@ -20,8 +20,6 @@ defmodule Loomkin.Session.Architect do
   alias Loomkin.Session.Persistence
   alias Loomkin.Telemetry, as: LoomkinTelemetry
 
-  require Logger
-
   # Planning-phase tools: the architect can spawn teams for complex tasks
   @planning_tools [
     Loomkin.Tools.TeamSpawn,
@@ -44,10 +42,6 @@ defmodule Loomkin.Session.Architect do
 
     # Fast-path: skip planning for trivial messages (greetings, thanks, etc.)
     if trivial_message?(user_text) do
-      Logger.info(
-        "[Architect] Trivial message detected — skipping planning, using conversational response"
-      )
-
       # Save user message to conversation
       {:ok, _} =
         Persistence.save_message(%{session_id: state.id, role: :user, content: user_text})
@@ -63,10 +57,6 @@ defmodule Loomkin.Session.Architect do
   end
 
   defp run_planning(user_text, state, architect_model, editor_model, _opts) do
-    Logger.info(
-      "[Architect] Starting run — architect=#{architect_model} editor=#{editor_model} session=#{state.id}"
-    )
-
     broadcast(state.id, {:architect_phase, :planning})
 
     case plan(user_text, state, architect_model: architect_model) do
@@ -77,25 +67,18 @@ defmodule Loomkin.Session.Architect do
         cond do
           team_spawned ->
             # Team was spawned to handle the task — don't fall back or re-plan
-            Logger.info("[Architect] Team spawned — delegating execution to agents")
             summary = plan_data["summary"] || "Team spawned to handle task"
             {:ok, summary, state}
 
           steps == [] ->
-            Logger.info(
-              "[Architect] Plan returned 0 steps — falling back to conversational response"
-            )
-
             conversational_fallback(user_text, state, architect_model)
 
           true ->
-            Logger.info("[Architect] Plan succeeded with #{length(steps)} steps, executing...")
             broadcast(state.id, {:architect_phase, :executing})
             execute_plan(plan_data, state, editor_model: editor_model)
         end
 
       {:error, reason, state} ->
-        Logger.error("[Architect] Plan phase failed: #{inspect(reason)}")
         {:error, reason, state}
     end
   end
@@ -169,8 +152,6 @@ defmodule Loomkin.Session.Architect do
       )
     end
 
-    Logger.info("[Architect] Calling LLM provider=#{provider} model=#{model_id}")
-
     case Loomkin.LLMRetry.with_retry([on_retry: on_retry], fn ->
            LoomkinTelemetry.span_llm_request(telemetry_meta, fn ->
              call_llm(provider, model_id, req_messages, [{:session_id, state.id} | opts])
@@ -179,10 +160,8 @@ defmodule Loomkin.Session.Architect do
       {:ok, response} ->
         # Check if the architect chose to use tools (e.g. team_spawn) instead of a JSON plan
         classified = ReqLLM.Response.classify(response)
-        Logger.info("[Architect] LLM response classified as type=#{classified.type}")
 
         if classified.type == :tool_calls do
-          Logger.info("[Architect] Planning phase invoked tools — executing team operations")
           update_usage(state.id, response)
 
           handle_planning_tool_calls(
@@ -197,20 +176,11 @@ defmodule Loomkin.Session.Architect do
           )
         else
           text = extract_text(response)
-
-          Logger.debug(
-            "[Architect] Plan response received, parsing... (#{String.length(text)} chars)"
-          )
-
           update_usage(state.id, response)
 
           case parse_plan_with_retry(text, provider, model_id, req_messages, state, opts) do
             {:ok, plan_data, state} ->
               steps = plan_data["plan"] || []
-
-              Logger.debug(
-                "[Architect] Parsed plan: #{length(steps)} steps — #{inspect(plan_data, limit: 500)}"
-              )
 
               state =
                 if steps != [] do
@@ -235,13 +205,11 @@ defmodule Loomkin.Session.Architect do
               {:ok, plan_data, state}
 
             {:error, reason, state} ->
-              Logger.error("[Architect] Failed to parse plan after retries: #{reason}")
               {:error, "Failed to parse architect plan: #{reason}", state}
           end
         end
 
       {:error, reason} ->
-        Logger.error("[Architect] Plan LLM call returned error: #{inspect(reason)}")
         {:error, reason, state}
     end
   end
@@ -271,8 +239,6 @@ defmodule Loomkin.Session.Architect do
          user_text
        ) do
     tool_calls = classified.tool_calls
-    tool_names = Enum.map(tool_calls, fn tc -> tc[:name] || tc["name"] end)
-    Logger.info("[Architect] Planning tools: #{Enum.join(tool_names, ", ")}")
 
     {results, spawned_team_ids} =
       Enum.reduce(tool_calls, {[], []}, fn tool_call, {res, team_ids} ->
@@ -310,10 +276,6 @@ defmodule Loomkin.Session.Architect do
       end)
 
     response_text = Enum.join(results, "\n\n")
-
-    Logger.info(
-      "[Architect] Tool results: #{inspect(results, limit: 300)} spawned_team_ids=#{inspect(spawned_team_ids)}"
-    )
 
     # Bootstrap: send the user's request to each spawned team's lead agent
     for team_id <- spawned_team_ids do
@@ -362,13 +324,9 @@ defmodule Loomkin.Session.Architect do
         List.first(agents)
 
     if lead do
-      Logger.info("[Architect] Bootstrapping lead agent #{lead.name} in team #{team_id}")
-
       Task.Supervisor.start_child(Loomkin.Teams.TaskSupervisor, fn ->
         Agent.send_message(lead.pid, user_text)
       end)
-    else
-      Logger.warning("[Architect] No agents found in team #{team_id} to bootstrap")
     end
   end
 
@@ -411,10 +369,6 @@ defmodule Loomkin.Session.Architect do
       {:ok, response} ->
         text = extract_text(response)
 
-        Logger.info(
-          "[Architect] Conversational fallback responded (#{String.length(text)} chars)"
-        )
-
         {:ok, _} =
           Persistence.save_message(%{session_id: state.id, role: :assistant, content: text})
 
@@ -425,7 +379,6 @@ defmodule Loomkin.Session.Architect do
         {:ok, text, state}
 
       {:error, reason} ->
-        Logger.error("[Architect] Conversational fallback failed: #{inspect(reason)}")
         {:error, reason, state}
     end
   end
@@ -469,7 +422,6 @@ defmodule Loomkin.Session.Architect do
     action = step["action"]
     details = step["details"]
     description = step["description"]
-    Logger.info("[Architect] Executing step: #{action} #{file} — #{description}")
 
     # Build a focused prompt for the editor
     editor_prompt = build_editor_prompt(file, action, description, details, state)
@@ -525,7 +477,6 @@ defmodule Loomkin.Session.Architect do
          end) do
       {:ok, response} ->
         classified = ReqLLM.Response.classify(response)
-        Logger.debug("[Architect] Editor iteration=#{iteration} response_type=#{classified.type}")
 
         handle_editor_response(
           classified,
@@ -539,10 +490,6 @@ defmodule Loomkin.Session.Architect do
         )
 
       {:error, reason} ->
-        Logger.error(
-          "[Architect] Editor LLM call failed iteration=#{iteration}: #{inspect(reason)}"
-        )
-
         {:error, reason, state}
     end
   end
@@ -560,12 +507,6 @@ defmodule Loomkin.Session.Architect do
     # Execute tools in the editor context
     assistant_content = classified.text || ""
     tool_calls = classified.tool_calls
-
-    tool_names = Enum.map(tool_calls, fn tc -> tc[:name] || tc["name"] end)
-
-    Logger.info(
-      "[Architect] Editor iteration=#{iteration} calling tools: #{Enum.join(tool_names, ", ")}"
-    )
 
     tool_call_msgs =
       Enum.map(tool_calls, fn tc ->
@@ -602,18 +543,12 @@ defmodule Loomkin.Session.Architect do
                   end)
 
                 {:error, :not_found} ->
-                  Logger.warning("[Architect] Tool not found: #{tool_name}")
                   "Error: Tool '#{tool_name}' not found"
               end
 
             :denied ->
-              Logger.info("[Architect] Permission denied for #{tool_name} on #{tool_path}")
               "Error: Permission denied for #{tool_name} on #{tool_path}"
           end
-
-        Logger.debug(
-          "[Architect] Tool #{tool_name} result: #{String.slice(to_string(result_text), 0, 200)}"
-        )
 
         broadcast(st.id, {:tool_executing, st.id, tool_name})
         broadcast(st.id, {:tool_complete, st.id, tool_name, result_text})
@@ -760,10 +695,6 @@ defmodule Loomkin.Session.Architect do
   end
 
   defp retry_json_parse(text, reason, provider, model_id, req_messages, state, opts, attempt) do
-    Logger.warning(
-      "[Architect] JSON parse failed (attempt #{attempt + 1}/#{@max_json_retries}), asking LLM to fix: #{reason}"
-    )
-
     broadcast(
       state.id,
       {:llm_retry, state.id,
@@ -790,7 +721,6 @@ defmodule Loomkin.Session.Architect do
 
         case parse_plan(corrected_text) do
           {:ok, plan_data} ->
-            Logger.info("[Architect] JSON parse retry #{attempt + 1} succeeded")
             {:ok, plan_data, state}
 
           {:error, new_reason} ->
@@ -964,10 +894,6 @@ defmodule Loomkin.Session.Architect do
     {session_id, opts} = Keyword.pop(opts, :session_id)
     model_spec = "#{provider}:#{model_id}"
 
-    Logger.debug(
-      "[Architect] Calling LLM model=#{model_spec} msg_count=#{length(messages)} opts=#{inspect(Map.keys(Map.new(opts)))}"
-    )
-
     if session_id do
       broadcast(session_id, {:stream_start, session_id})
     end
@@ -986,20 +912,11 @@ defmodule Loomkin.Session.Architect do
         end
       rescue
         e ->
-          Logger.error("[Architect] LLM call crashed: #{Exception.message(e)}")
           {:error, Exception.message(e)}
       end
 
     if session_id do
       broadcast(session_id, {:stream_end, session_id})
-    end
-
-    case result do
-      {:ok, _} ->
-        Logger.debug("[Architect] LLM call succeeded for #{model_spec}")
-
-      {:error, reason} ->
-        Logger.error("[Architect] LLM call failed for #{model_spec}: #{inspect(reason)}")
     end
 
     result
@@ -1097,7 +1014,7 @@ defmodule Loomkin.Session.Architect do
     signal = Loomkin.Signals.Session.NewMessage.new!(%{session_id: session_id})
     Loomkin.Signals.publish(%{signal | data: Map.put(signal.data, :message, msg)})
   rescue
-    e -> Logger.debug("[Architect] Broadcast failed: #{Exception.message(e)}")
+    _ -> :ok
   end
 
   defp broadcast(session_id, {:permission_request, _sid, tool_name, tool_path, :session}) do
@@ -1110,7 +1027,7 @@ defmodule Loomkin.Session.Architect do
 
     Loomkin.Signals.publish(signal)
   rescue
-    e -> Logger.debug("[Architect] Broadcast failed: #{Exception.message(e)}")
+    _ -> :ok
   end
 
   defp broadcast(session_id, event) do
@@ -1120,6 +1037,6 @@ defmodule Loomkin.Session.Architect do
 
     Loomkin.Signals.publish(%{signal | data: Map.put(signal.data, :raw_event, event)})
   rescue
-    e -> Logger.debug("[Architect] Broadcast failed: #{Exception.message(e)}")
+    _ -> :ok
   end
 end

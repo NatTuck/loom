@@ -21,8 +21,6 @@ defmodule Loomkin.Tools.Shell do
 
   import Loomkin.Tool, only: [param!: 2, param: 3]
 
-  require Logger
-
   @default_timeout 30_000
   @max_output_chars 10_000
 
@@ -56,7 +54,6 @@ defmodule Loomkin.Tools.Shell do
     with :ok <- check_blocklist(command),
          :ok <- check_allowlist(command),
          :ok <- check_working_directory(command, project_path) do
-      Logger.info("[Shell] Executing: #{String.slice(command, 0, 200)}")
       execute_via_port(command, project_path, timeout)
     end
   end
@@ -66,10 +63,6 @@ defmodule Loomkin.Tools.Shell do
   defp check_blocklist(command) do
     case Enum.find(@blocked_patterns, fn {regex, _reason} -> Regex.match?(regex, command) end) do
       {_regex, reason} ->
-        Logger.warning(
-          "[Shell] Blocked dangerous command (#{reason}): #{String.slice(command, 0, 100)}"
-        )
-
         {:error, "Command blocked: #{reason}"}
 
       nil ->
@@ -87,7 +80,6 @@ defmodule Loomkin.Tools.Shell do
           :ok
         else
           blocked = Enum.reject(chained_cmds, &(&1 in allowed))
-          Logger.warning("[Shell] Command not in allowlist: #{inspect(blocked)}")
 
           {:error,
            "Command not in allowlist. Allowed: #{Enum.join(allowed, ", ")}. Blocked: #{Enum.join(blocked, ", ")}"}
@@ -113,7 +105,6 @@ defmodule Loomkin.Tools.Shell do
 
     if cd_escape do
       [target] = cd_escape
-      Logger.warning("[Shell] Blocked directory escape: cd #{target}")
       {:error, "Cannot cd outside project directory: #{target}"}
     else
       # 2. Block absolute paths outside project anywhere in the command.
@@ -135,7 +126,6 @@ defmodule Loomkin.Tools.Shell do
           :ok
 
         path ->
-          Logger.warning("[Shell] Blocked absolute path outside project: #{path}")
           {:error, "Cannot access paths outside project directory: #{path}"}
       end
     end

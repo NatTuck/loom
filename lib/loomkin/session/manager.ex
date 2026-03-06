@@ -9,8 +9,6 @@ defmodule Loomkin.Session.Manager do
 
   alias Loomkin.Session
 
-  require Logger
-
   @doc """
   Start a new session under the DynamicSupervisor.
 
@@ -80,8 +78,6 @@ defmodule Loomkin.Session.Manager do
   defp maybe_create_backing_team(session_id, opts) do
     project_path = Keyword.get(opts, :project_path)
 
-    Logger.debug("[Session.Manager] maybe_create_backing_team session=#{session_id}")
-
     try do
       {:ok, team_id} =
         Loomkin.Teams.Manager.create_team(
@@ -89,7 +85,8 @@ defmodule Loomkin.Session.Manager do
           project_path: project_path
         )
 
-      Logger.info("[Session.Manager] Team created team_id=#{team_id} for session=#{session_id}")
+      require Logger
+      Logger.info("[Kin:session] backing team created team=#{team_id} session=#{session_id}")
 
       # Persist team_id to the session DB record
       persist_team_id(session_id, team_id)
@@ -97,34 +94,35 @@ defmodule Loomkin.Session.Manager do
       # Notify the session process about its team
       case Registry.lookup(Loomkin.SessionRegistry, session_id) do
         [{pid, _}] ->
-          Logger.info("[Session.Manager] Sending :team_created to session pid=#{inspect(pid)}")
           send(pid, {:team_created, team_id})
 
         [] ->
-          Logger.error("[Session.Manager] Session NOT FOUND in registry! session=#{session_id}")
+          :ok
       end
     rescue
       e ->
+        require Logger
+
         Logger.error(
-          "[Session.Manager] Error creating backing team: #{Exception.message(e)}\n#{Exception.format_stacktrace(__STACKTRACE__)}"
+          "[Kin:session] backing team FAILED session=#{session_id} error=#{inspect(e)}"
         )
+
+        :ok
     end
   end
 
   defp persist_team_id(session_id, team_id) do
     case Loomkin.Session.Persistence.get_session(session_id) do
       nil ->
-        Logger.warning(
-          "[Session.Manager] Cannot persist team_id — session #{session_id} not found"
-        )
+        :ok
 
       db_session ->
         case Loomkin.Session.Persistence.update_session(db_session, %{team_id: team_id}) do
           {:ok, _} ->
             :ok
 
-          {:error, reason} ->
-            Logger.warning("[Session.Manager] Failed to persist team_id: #{inspect(reason)}")
+          {:error, _reason} ->
+            :ok
         end
     end
   end
@@ -147,10 +145,6 @@ defmodule Loomkin.Session.Manager do
         # Dissolve the backing team to clean up ETS tables and agent processes
         if team_id do
           Loomkin.Teams.Manager.dissolve_team(team_id)
-
-          Logger.debug(
-            "[Session.Manager] Dissolved backing team #{team_id} for session #{session_id}"
-          )
         end
 
         :ok

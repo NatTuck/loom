@@ -9,8 +9,8 @@ defmodule Loomkin.Decisions.Narrative do
   def for_session(nil), do: []
 
   def for_session(session_id) do
-    case Ecto.UUID.cast(session_id) do
-      {:ok, _uuid} ->
+    case Ecto.UUID.dump(session_id) do
+      {:ok, _bin} ->
         DecisionNode
         |> where([n], n.session_id == ^session_id)
         |> order_by([n], asc: n.inserted_at)

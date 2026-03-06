@@ -15,8 +15,6 @@ defmodule Loomkin.Telemetry.Metrics do
   - Budget warning broadcasts
   """
 
-  require Logger
-
   alias Loomkin.Teams.CostTracker
 
   use GenServer
@@ -372,8 +370,7 @@ defmodule Loomkin.Telemetry.Metrics do
     signal = Loomkin.Signals.System.MetricsUpdated.new!()
     Loomkin.Signals.publish(signal)
   rescue
-    e ->
-      Logger.debug("[Metrics] Broadcast failed: #{Exception.message(e)}")
+    _e ->
       :ok
   end
 
@@ -383,8 +380,7 @@ defmodule Loomkin.Telemetry.Metrics do
 
     Loomkin.Signals.publish(%{signal | data: Map.merge(signal.data, payload)})
   rescue
-    e ->
-      Logger.debug("[Metrics] Team broadcast failed: #{Exception.message(e)}")
+    _e ->
       :ok
   end
 
@@ -399,8 +395,7 @@ defmodule Loomkin.Telemetry.Metrics do
 
     Loomkin.Signals.publish(signal)
   rescue
-    e ->
-      Logger.debug("[Metrics] Team broadcast failed: #{Exception.message(e)}")
+    _e ->
       :ok
   end
 
@@ -408,8 +403,7 @@ defmodule Loomkin.Telemetry.Metrics do
     signal = Loomkin.Signals.Team.BudgetWarning.new!(%{team_id: payload.team_id})
     Loomkin.Signals.publish(%{signal | data: Map.merge(signal.data, payload)})
   rescue
-    e ->
-      Logger.debug("[Metrics] Team broadcast failed: #{Exception.message(e)}")
+    _e ->
       :ok
   end
 end

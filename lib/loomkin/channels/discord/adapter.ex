@@ -10,8 +10,6 @@ defmodule Loomkin.Channels.Discord.Adapter do
 
   alias Loomkin.Channels.Discord.Formatter
 
-  require Logger
-
   @impl true
   def send_text(binding, text, _opts) do
     channel_id = String.to_integer(binding.channel_id)
@@ -24,7 +22,6 @@ defmodule Loomkin.Channels.Discord.Adapter do
     :ok
   rescue
     e ->
-      Logger.error("[Discord.Adapter] send_text failed: #{inspect(e)}")
       {:error, e}
   end
 
@@ -41,7 +38,6 @@ defmodule Loomkin.Channels.Discord.Adapter do
     :ok
   rescue
     e ->
-      Logger.error("[Discord.Adapter] send_question failed: #{inspect(e)}")
       {:error, e}
   end
 
@@ -58,7 +54,6 @@ defmodule Loomkin.Channels.Discord.Adapter do
     :ok
   rescue
     e ->
-      Logger.error("[Discord.Adapter] send_activity failed: #{inspect(e)}")
       {:error, e}
   end
 

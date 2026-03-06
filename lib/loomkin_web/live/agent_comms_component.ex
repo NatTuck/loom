@@ -125,7 +125,7 @@ defmodule LoomkinWeb.AgentCommsComponent do
       <%!-- Section header --%>
       <div class="px-3 py-2 flex items-center gap-2">
         <span class="text-[10px] font-semibold text-muted uppercase tracking-widest">
-          Team Comms
+          Kin Comms
         </span>
         <span class="badge text-[10px] tabular-nums">{length(@events)}</span>
       </div>

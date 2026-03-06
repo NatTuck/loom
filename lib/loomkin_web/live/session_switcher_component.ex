@@ -1,8 +1,6 @@
 defmodule LoomkinWeb.SessionSwitcherComponent do
   use LoomkinWeb, :live_component
 
-  require Logger
-
   alias Loomkin.Session.Persistence
 
   def update(assigns, socket) do
@@ -187,8 +185,7 @@ defmodule LoomkinWeb.SessionSwitcherComponent do
         end
     end
   rescue
-    e ->
-      Logger.warning("[SessionSwitcher] relative_time failed: #{Exception.message(e)}")
+    _e ->
       "just now"
   end
 end

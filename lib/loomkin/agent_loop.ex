@@ -12,8 +12,6 @@ defmodule Loomkin.AgentLoop do
   alias Loomkin.Teams.ContextOffload
   alias Loomkin.Telemetry, as: LoomkinTelemetry
 
-  require Logger
-
   @max_rate_limit_retries 3
   @max_iterations 25
 
@@ -63,8 +61,7 @@ defmodule Loomkin.AgentLoop do
       strategy when strategy in [:cot, :cod, :tot, :adaptive] ->
         Loomkin.AgentLoop.Strategies.run(strategy, messages, config)
 
-      unknown ->
-        Logger.warning("Unknown reasoning strategy #{inspect(unknown)}, falling back to :react")
+      _unknown ->
         run_with_rate_limit_retry(messages, config, 0)
     end
   end
@@ -75,16 +72,11 @@ defmodule Loomkin.AgentLoop do
     catch
       {:budget_exceeded, scope} ->
         error_msg = "Budget exceeded (#{scope}). Stopping agent loop."
-        Logger.warning(error_msg)
         {:error, error_msg, messages}
 
       {:rate_limited, provider} ->
         if attempt < @max_rate_limit_retries do
           backoff_ms = Integer.pow(2, attempt) * 1_000
-
-          Logger.warning(
-            "Rate limited by #{provider}, retry #{attempt + 1}/#{@max_rate_limit_retries} after #{backoff_ms}ms"
-          )
 
           config.on_event.(:rate_limited, %{
             provider: provider,
@@ -95,10 +87,6 @@ defmodule Loomkin.AgentLoop do
           Process.sleep(backoff_ms)
           run_with_rate_limit_retry(messages, config, attempt + 1)
         else
-          Logger.warning(
-            "Rate limited by #{provider}, max retries (#{@max_rate_limit_retries}) exhausted"
-          )
-
           {:error, :rate_limited, messages}
         end
     end
@@ -148,7 +136,6 @@ defmodule Loomkin.AgentLoop do
       "Agent exceeded maximum iterations (#{max}). " <>
         "Stopping to avoid infinite loops."
 
-    Logger.warning("AgentLoop: #{error_msg}")
     emit(config, :max_iterations_exceeded, %{iterations: iteration, max: max})
 
     # Return the error as an assistant message so the user sees it
@@ -207,10 +194,6 @@ defmodule Loomkin.AgentLoop do
       iteration: iteration
     }
 
-    Logger.debug(
-      "AgentLoop calling LLM: #{provider}:#{model_id}, #{length(req_messages)} messages, #{length(opts[:tools] || [])} tools"
-    )
-
     on_retry = fn attempt, reason, backoff_ms ->
       emit(config, :llm_retry, %{
         attempt: attempt,
@@ -226,11 +209,9 @@ defmodule Loomkin.AgentLoop do
          end) do
       {:ok, response} ->
         classified = ReqLLM.Response.classify(response)
-        Logger.debug("AgentLoop LLM response type: #{classified.type}")
         handle_classified(classified, response, messages, config, iteration)
 
       {:error, reason} ->
-        Logger.error("AgentLoop LLM error: #{inspect(reason)}")
         {:error, reason, messages}
     end
   end
@@ -349,10 +330,12 @@ defmodule Loomkin.AgentLoop do
     # Dynamically resolve project_path at each tool execution
     effective_path = current_project_path(config)
 
+    # For team_spawn: if this agent is in a root team, use its own team_id as parent
+    # so sub-teams are created under it (not as standalone teams)
     parent_team_id =
       case Loomkin.Teams.Manager.get_parent_team(config.team_id) do
         {:ok, parent_id} -> parent_id
-        :none -> nil
+        :none -> config.team_id
       end
 
     context = %{

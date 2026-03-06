@@ -31,8 +31,6 @@ defmodule Loomkin.Auth.Providers.OpenAI do
 
   @behaviour Loomkin.Auth.Provider
 
-  require Logger
-
   # ── Constants (from opencode-openai-codex-auth) ───────────────────
 
   # Default shared client ID (Codex CLI public client)
@@ -134,11 +132,9 @@ defmodule Loomkin.Auth.Providers.OpenAI do
         {:ok, token_data}
 
       {:ok, %Req.Response{status: status, body: resp_body}} ->
-        Logger.error("OpenAI token exchange failed (#{status}): #{inspect(resp_body)}")
         {:error, {:token_exchange_failed, status, resp_body}}
 
       {:error, reason} ->
-        Logger.error("OpenAI token exchange HTTP error: #{inspect(reason)}")
         {:error, {:http_error, reason}}
     end
   end
@@ -175,11 +171,9 @@ defmodule Loomkin.Auth.Providers.OpenAI do
         {:ok, token_data}
 
       {:ok, %Req.Response{status: status, body: resp_body}} ->
-        Logger.error("OpenAI token refresh failed (#{status}): #{inspect(resp_body)}")
         {:error, {:refresh_failed, status, resp_body}}
 
       {:error, reason} ->
-        Logger.error("OpenAI token refresh HTTP error: #{inspect(reason)}")
         {:error, {:http_error, reason}}
     end
   end

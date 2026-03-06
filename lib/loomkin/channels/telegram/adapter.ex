@@ -10,8 +10,6 @@ defmodule Loomkin.Channels.Telegram.Adapter do
 
   alias Loomkin.Channels.Telegram.Formatter
 
-  require Logger
-
   # --- Adapter Callbacks ---
 
   @impl true
@@ -87,8 +85,8 @@ defmodule Loomkin.Channels.Telegram.Adapter do
             {:ok, _} ->
               :ok
 
-            {:error, reason} ->
-              Logger.error("[Telegram.Adapter] answer_callback_query failed: #{inspect(reason)}")
+            {:error, _reason} ->
+              :ok
           end
         end)
 

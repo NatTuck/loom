@@ -33,8 +33,6 @@ defmodule Loomkin.Providers.OpenAIOAuth do
     id: :openai_oauth,
     default_base_url: "https://chatgpt.com/backend-api"
 
-  require Logger
-
   alias Loomkin.Auth.TokenStore
   alias Loomkin.Auth.Providers.OpenAI, as: OpenAIAuth
 
@@ -324,12 +322,6 @@ defmodule Loomkin.Providers.OpenAIOAuth do
 
       token ->
         account_id = OpenAIAuth.extract_account_id(token)
-
-        if is_nil(account_id) do
-          Logger.warning(
-            "Could not extract chatgpt_account_id from OpenAI JWT — some requests may fail"
-          )
-        end
 
         {:ok, {token, account_id}}
     end

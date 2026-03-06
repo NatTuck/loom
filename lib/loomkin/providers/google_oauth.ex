@@ -24,11 +24,6 @@ defmodule Loomkin.Providers.GoogleOAuth do
     id: :google_oauth,
     default_base_url: "https://generativelanguage.googleapis.com/v1beta"
 
-  import ReqLLM.Provider.Utils,
-    only: [sanitize_url: 1]
-
-  require Logger
-
   alias Loomkin.Auth.TokenStore
 
   @google ReqLLM.Providers.Google
@@ -322,8 +317,6 @@ defmodule Loomkin.Providers.GoogleOAuth do
       ]
 
       url = "#{base_url}/models/#{get_api_model_id(model)}:streamGenerateContent?alt=sse"
-
-      Logger.debug("GoogleOAuth attach_stream URL: #{inspect(sanitize_url(url))}")
 
       body = build_stream_body(model, context, opts_with_base)
 

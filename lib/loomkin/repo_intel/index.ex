@@ -3,8 +3,6 @@ defmodule Loomkin.RepoIntel.Index do
 
   use GenServer
 
-  require Logger
-
   @table :loomkin_repo_index
 
   @skip_dirs ~w(.git _build deps node_modules .loomkin .elixir_ls)

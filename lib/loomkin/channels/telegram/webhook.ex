@@ -14,8 +14,6 @@ defmodule Loomkin.Channels.Telegram.Webhook do
 
   import Plug.Conn
 
-  require Logger
-
   alias Loomkin.Channels.Router, as: ChannelRouter
 
   @doc false
@@ -29,15 +27,12 @@ defmodule Loomkin.Channels.Telegram.Webhook do
       handle_update(conn, update)
     else
       {:error, :unauthorized} ->
-        Logger.warning("[Telegram.Webhook] Invalid or missing secret token")
         send_resp(conn, 401, "Unauthorized")
 
       {:error, :invalid} ->
-        Logger.warning("[Telegram.Webhook] Invalid request body")
         send_resp(conn, 400, "Bad Request")
 
-      {:error, %Jason.DecodeError{} = error} ->
-        Logger.warning("[Telegram.Webhook] JSON decode error: #{inspect(error)}")
+      {:error, %Jason.DecodeError{}} ->
         send_resp(conn, 400, "Invalid JSON")
     end
   end
@@ -89,14 +84,14 @@ defmodule Loomkin.Channels.Telegram.Webhook do
             :ok
 
           {:error, :no_binding} ->
-            Logger.debug("[Telegram.Webhook] No binding for chat #{channel_id_str}")
+            :ok
 
-          {:error, reason} ->
-            Logger.error("[Telegram.Webhook] Error handling update: #{inspect(reason)}")
+          {:error, _reason} ->
+            :ok
         end
       end)
     else
-      Logger.debug("[Telegram.Webhook] Update without chat_id, ignoring")
+      :ok
     end
 
     # Always respond 200 OK to Telegram to prevent retries

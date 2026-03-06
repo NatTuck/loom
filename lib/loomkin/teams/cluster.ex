@@ -15,8 +15,6 @@ defmodule Loomkin.Teams.Cluster do
   Requires `libcluster` and `horde` in mix.exs. See `docs/clustering-deps.md`.
   """
 
-  require Logger
-
   @doc "Check whether clustering is enabled in config."
   @spec enabled?() :: boolean()
   def enabled? do
@@ -50,14 +48,13 @@ defmodule Loomkin.Teams.Cluster do
         start: {Cluster.Supervisor, :start_link, [topologies, [name: Loomkin.ClusterSupervisor]]}
       }
     else
-      # Stub when libcluster is not installed — logs warning on start
+      # Stub when libcluster is not installed — clustering disabled
       %{
         id: __MODULE__,
         start:
           {Task, :start_link,
            [
              fn ->
-               Logger.warning("[Cluster] libcluster not available — clustering disabled")
                Process.sleep(:infinity)
              end
            ]}
@@ -99,7 +96,6 @@ defmodule Loomkin.Teams.Cluster do
   """
   @spec handle_node_join(node()) :: :ok
   def handle_node_join(node) do
-    Logger.info("[Cluster] Node joined: #{node}")
     signal = Loomkin.Signals.System.NodeJoined.new!(%{node: node})
     Loomkin.Signals.publish(signal)
     :ok
@@ -112,7 +108,6 @@ defmodule Loomkin.Teams.Cluster do
   """
   @spec handle_node_leave(node()) :: :ok
   def handle_node_leave(node) do
-    Logger.warning("[Cluster] Node left: #{node}")
     signal = Loomkin.Signals.System.NodeLeft.new!(%{node: node})
     Loomkin.Signals.publish(signal)
     :ok

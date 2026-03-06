@@ -17,8 +17,6 @@ defmodule Loomkin.Tools.AskUser do
 
   import Loomkin.Tool, only: [param!: 2]
 
-  require Logger
-
   @doc false
   @impl true
   def run(params, context) do
@@ -43,8 +41,6 @@ defmodule Loomkin.Tools.AskUser do
       })
 
     Loomkin.Signals.publish(%{signal | data: Map.put(signal.data, :options, options)})
-
-    Logger.info("[AskUser] Agent #{agent_name} asking: #{question} (#{question_id})")
 
     # Block waiting for the answer (up to 5 minutes)
     receive do

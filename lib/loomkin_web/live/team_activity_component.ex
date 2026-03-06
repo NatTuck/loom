@@ -335,7 +335,7 @@ defmodule LoomkinWeb.TeamActivityComponent do
               <div class="text-muted" style="font-size: 2rem; opacity: 0.3;">&#9673;</div>
               <p class="text-sm text-muted">No activity yet</p>
               <p class="text-xs" style="color: var(--text-muted); opacity: 0.6;">
-                Events will appear here as your team works
+                Events will appear here as your kin works
               </p>
             </div>
           </div>
@@ -457,7 +457,7 @@ defmodule LoomkinWeb.TeamActivityComponent do
     meta = Map.get(event, :metadata, %{})
     from = meta[:from] || event.agent
     to = meta[:to]
-    display_to = if to, do: to, else: "Team"
+    display_to = if to, do: to, else: "Kin"
     content = event.content || ""
     long_content = String.length(content) > 280
     expanded = MapSet.member?(assigns.expanded_ids, event.id)

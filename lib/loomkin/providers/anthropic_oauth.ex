@@ -23,8 +23,6 @@ defmodule Loomkin.Providers.AnthropicOAuth do
     id: :anthropic_oauth,
     default_base_url: "https://api.anthropic.com"
 
-  require Logger
-
   alias Loomkin.Auth.TokenStore
 
   @anthropic ReqLLM.Providers.Anthropic

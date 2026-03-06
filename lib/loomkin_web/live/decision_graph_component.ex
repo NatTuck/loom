@@ -3,8 +3,6 @@ defmodule LoomkinWeb.DecisionGraphComponent do
 
   use LoomkinWeb, :live_component
 
-  require Logger
-
   alias Loomkin.Decisions.Graph
   alias Loomkin.Decisions.Pulse
 
@@ -760,11 +758,7 @@ defmodule LoomkinWeb.DecisionGraphComponent do
       pulse = maybe_generate_pulse(socket)
       {nodes, edges, pulse}
     rescue
-      e ->
-        Logger.warning(
-          "[DecisionGraphComponent] Failed to load graph data: #{Exception.message(e)}"
-        )
-
+      _e ->
         {[], [], nil}
     end
   end

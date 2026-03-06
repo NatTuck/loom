@@ -39,6 +39,12 @@ defmodule Loomkin.Tools.TeamSpawn do
   end
 
   defp spawn_from_roles(team_name, roles, project_path, parent_team_id, model, agent_name) do
+    require Logger
+
+    Logger.info(
+      "[Kin:team_spawn] team=#{team_name} roles=#{inspect(roles)} parent=#{inspect(parent_team_id)}"
+    )
+
     {:ok, team_id} =
       if parent_team_id do
         Manager.create_sub_team(parent_team_id, agent_name,

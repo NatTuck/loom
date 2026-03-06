@@ -8,8 +8,6 @@ defmodule Loomkin.Channels.AuditLog do
 
   use GenServer
 
-  require Logger
-
   @table :channel_audit_log
   @max_entries 200
 
@@ -54,14 +52,6 @@ defmodule Loomkin.Channels.AuditLog do
       result: result,
       response: response
     }
-
-    Logger.info("[AuditLog] #{channel}/#{channel_id} user=#{entry.user_id} /#{command} #{args}",
-      audit: true,
-      channel: channel,
-      command: command,
-      user_id: entry.user_id,
-      result: result
-    )
 
     GenServer.cast(__MODULE__, {:log, entry})
   end

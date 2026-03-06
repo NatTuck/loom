@@ -23,7 +23,6 @@ defmodule Loomkin.Auth.TokenStore do
   """
 
   use GenServer
-  require Logger
 
   alias Loomkin.Auth.ProviderRegistry
   alias Loomkin.Repo
@@ -74,7 +73,6 @@ defmodule Loomkin.Auth.TokenStore do
         if expires_at == nil or DateTime.compare(expires_at, DateTime.utc_now()) == :gt do
           token
         else
-          Logger.warning("OAuth token for #{provider} has expired")
           nil
         end
 
@@ -160,7 +158,7 @@ defmodule Loomkin.Auth.TokenStore do
     for token <- tokens do
       case safe_to_atom(token.provider) do
         {:ok, provider} -> load_token_into_cache(token, key, provider)
-        :error -> Logger.warning("Skipping unknown provider from DB: #{token.provider}")
+        :error -> :ok
       end
     end
 
@@ -179,7 +177,6 @@ defmodule Loomkin.Auth.TokenStore do
         end
       end)
 
-    Logger.info("TokenStore loaded #{length(tokens)} provider token(s)")
     {:noreply, %{state | refresh_timers: refresh_timers}}
   end
 
@@ -188,11 +185,9 @@ defmodule Loomkin.Auth.TokenStore do
     case persist_and_cache(provider, token_data, state) do
       {:ok, new_state} ->
         broadcast({:auth_connected, provider})
-        Logger.info("Stored OAuth tokens for provider: #{provider}")
         {:reply, :ok, new_state}
 
       {:error, reason} ->
-        Logger.error("Failed to store OAuth tokens for #{provider}: #{inspect(reason)}")
         {:reply, {:error, reason}, state}
     end
   end
@@ -209,25 +204,21 @@ defmodule Loomkin.Auth.TokenStore do
     state = cancel_refresh_timer(state, provider)
 
     broadcast({:auth_disconnected, provider})
-    Logger.info("Revoked OAuth tokens for provider: #{provider}")
     {:reply, :ok, state}
   end
 
   @impl true
   def handle_info({:refresh_token, provider}, state) do
-    Logger.info("Attempting token refresh for provider: #{provider}")
     handle_refresh_with_retry(provider, state, 0)
   end
 
   @impl true
   def handle_info({:refresh_retry, provider, attempt}, state) do
-    Logger.info("Retry #{attempt}/#{@max_refresh_retries} token refresh for #{provider}")
     handle_refresh_with_retry(provider, state, attempt)
   end
 
   @impl true
-  def handle_info(msg, state) do
-    Logger.warning("TokenStore received unexpected message: #{inspect(msg)}")
+  def handle_info(_msg, state) do
     {:noreply, state}
   end
 
@@ -352,8 +343,7 @@ defmodule Loomkin.Auth.TokenStore do
         :ets.insert(@table, {provider, cache_entry})
         :ok
 
-      {:error, reason} ->
-        Logger.error("Failed to decrypt token for #{provider}: #{inspect(reason)}")
+      {:error, _reason} ->
         :error
     end
   end
@@ -367,12 +357,10 @@ defmodule Loomkin.Auth.TokenStore do
 
     if seconds_until_expiry > 0 do
       timer_ref = Process.send_after(self(), {:refresh_token, provider}, refresh_in * 1000)
-      Logger.debug("Scheduled token refresh for #{provider} in #{refresh_in}s")
       {:ok, timer_ref}
     else
       # Token already expired — attempt an immediate refresh (the handler
       # will use the cached refresh_token from ETS if one exists)
-      Logger.info("Token for #{provider} already expired, scheduling immediate refresh")
       timer_ref = Process.send_after(self(), {:refresh_token, provider}, 1_000)
       {:ok, timer_ref}
     end
@@ -400,17 +388,9 @@ defmodule Loomkin.Auth.TokenStore do
           next_attempt = attempt + 1
           delay = @initial_retry_delay_ms * Integer.pow(4, attempt)
 
-          Logger.warning(
-            "Token refresh failed for #{provider} (attempt #{next_attempt}/#{@max_refresh_retries}), retrying in #{div(delay, 1000)}s: #{inspect(reason)}"
-          )
-
           Process.send_after(self(), {:refresh_retry, provider, next_attempt}, delay)
           {:noreply, state}
         else
-          Logger.error(
-            "Token refresh permanently failed for #{provider} after #{@max_refresh_retries} retries: #{inspect(reason)}"
-          )
-
           broadcast({:auth_refresh_failed, provider, reason})
           {:noreply, state}
         end

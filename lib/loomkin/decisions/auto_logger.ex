@@ -3,8 +3,6 @@ defmodule Loomkin.Decisions.AutoLogger do
 
   use GenServer
 
-  require Logger
-
   alias Loomkin.Decisions.Graph
   alias Loomkin.Teams.Tasks
 
@@ -36,7 +34,6 @@ defmodule Loomkin.Decisions.AutoLogger do
       task_nodes: %{}
     }
 
-    Logger.info("[AutoLogger] Started for team #{team_id}")
     {:ok, state}
   end
 
@@ -114,8 +111,7 @@ defmodule Loomkin.Decisions.AutoLogger do
 
         {:noreply, state}
 
-      {:error, reason} ->
-        Logger.warning("[AutoLogger] Failed to log task_completed node: #{inspect(reason)}")
+      {:error, _reason} ->
         {:noreply, state}
     end
   end
@@ -140,8 +136,7 @@ defmodule Loomkin.Decisions.AutoLogger do
 
         {:noreply, state}
 
-      {:error, reason} ->
-        Logger.warning("[AutoLogger] Failed to log task_failed node: #{inspect(reason)}")
+      {:error, _reason} ->
         {:noreply, state}
     end
   end
@@ -181,8 +176,7 @@ defmodule Loomkin.Decisions.AutoLogger do
         link_to_active_goal(node, state.team_id)
         result
 
-      {:error, reason} = error ->
-        Logger.warning("[AutoLogger] Failed to log node: #{inspect(reason)}")
+      {:error, _reason} = error ->
         error
     end
   end

@@ -11,8 +11,6 @@ defmodule Loomkin.Channels.Discord.Consumer do
   falls back to a plain GenServer (for compilation in test environments).
   """
 
-  require Logger
-
   alias Loomkin.Channels.Router
 
   @adapter Loomkin.Channels.Discord.Adapter
@@ -30,7 +28,6 @@ defmodule Loomkin.Channels.Discord.Consumer do
 
     @impl true
     def init(_opts) do
-      Logger.warning("[Discord.Consumer] Nostrum not loaded, consumer inactive")
       {:ok, %{}}
     end
   end

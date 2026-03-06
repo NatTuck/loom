@@ -37,8 +37,6 @@ defmodule Loomkin.Auth.Providers.Google do
 
   @behaviour Loomkin.Auth.Provider
 
-  require Logger
-
   # ── Constants ──────────────────────────────────────────────────────
 
   @default_scope "https://www.googleapis.com/auth/cloud-platform"
@@ -90,7 +88,6 @@ defmodule Loomkin.Auth.Providers.Google do
         {:ok, url}
 
       {:error, error} ->
-        Logger.error("Google OAuth authorize_url failed: #{inspect(error)}")
         {:error, {:authorize_url_failed, error}}
     end
   end
@@ -102,10 +99,6 @@ defmodule Loomkin.Auth.Providers.Google do
     # Retrieve the stashed session_params from the authorize phase
     case pop_session_params(state_token) do
       nil ->
-        Logger.error(
-          "Google OAuth: no session_params found for state #{String.slice(state_token, 0..7)}..."
-        )
-
         {:error, :session_params_not_found}
 
       session_params ->
@@ -129,7 +122,6 @@ defmodule Loomkin.Auth.Providers.Google do
             {:ok, token_data}
 
           {:error, error} ->
-            Logger.error("Google OAuth callback failed: #{inspect(error)}")
             {:error, {:token_exchange_failed, error}}
         end
     end
@@ -160,7 +152,6 @@ defmodule Loomkin.Auth.Providers.Google do
         {:ok, token_data}
 
       {:error, error} ->
-        Logger.error("Google OAuth token refresh failed: #{inspect(error)}")
         {:error, {:refresh_failed, error}}
     end
   end

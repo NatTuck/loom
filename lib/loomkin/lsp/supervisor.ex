@@ -9,8 +9,6 @@ defmodule Loomkin.LSP.Supervisor do
 
   use Supervisor
 
-  require Logger
-
   def start_link(opts \\ []) do
     Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -69,13 +67,7 @@ defmodule Loomkin.LSP.Supervisor do
             args: server[:args] || server["args"] || []
           ] ++ if(root_path, do: [root_path: root_path], else: [])
 
-        case start_client(opts) do
-          {:ok, _pid} ->
-            Logger.info("[LSP] Started client: #{opts[:name]}")
-
-          {:error, reason} ->
-            Logger.warning("[LSP] Failed to start #{opts[:name]}: #{inspect(reason)}")
-        end
+        start_client(opts)
       end)
     end
 

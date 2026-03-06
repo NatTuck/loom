@@ -4,8 +4,6 @@ defmodule Loomkin.Decisions.Cascade do
   alias Loomkin.Decisions.Graph
   alias Loomkin.Teams.Comms
 
-  require Logger
-
   @default_threshold 50
 
   @doc """
@@ -54,11 +52,7 @@ defmodule Loomkin.Decisions.Cascade do
             notify_agent(source_node, downstream_node, edge_type)
             count + 1
 
-          {:error, reason} ->
-            Logger.warning(
-              "[Cascade] Failed to update node #{downstream_node.id}: #{inspect(reason)}"
-            )
-
+          {:error, _reason} ->
             count
         end
       end

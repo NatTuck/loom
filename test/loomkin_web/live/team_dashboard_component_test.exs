@@ -22,7 +22,7 @@ defmodule LoomkinWeb.TeamDashboardComponentTest do
           team_id: @team_id
         })
 
-      assert html =~ "Team:"
+      assert html =~ "Kin:"
       assert html =~ @team_id
     end
 
@@ -34,7 +34,7 @@ defmodule LoomkinWeb.TeamDashboardComponentTest do
         })
 
       assert html =~ "Agents"
-      assert html =~ "No agents spawned"
+      assert html =~ "No kin spawned"
     end
 
     test "renders empty task list" do

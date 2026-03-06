@@ -8,8 +8,6 @@ defmodule Loomkin.RepoIntel.TreeSitter do
   Supports: Elixir, JavaScript, TypeScript, Python, Ruby, Go, Rust.
   """
 
-  require Logger
-
   @ets_table :loomkin_tree_sitter_cache
 
   @doc "Check if tree-sitter CLI is available on the system."

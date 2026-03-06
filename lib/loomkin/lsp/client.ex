@@ -8,8 +8,6 @@ defmodule Loomkin.LSP.Client do
 
   use GenServer
 
-  require Logger
-
   alias Loomkin.LSP.Protocol
 
   defstruct [
@@ -113,8 +111,7 @@ defmodule Loomkin.LSP.Client do
 
         {:noreply, state}
 
-      {:error, reason} ->
-        Logger.warning("[LSP:#{state.name}] Auto-initialize failed: #{inspect(reason)}")
+      {:error, _reason} ->
         {:noreply, state}
     end
   end
@@ -201,9 +198,7 @@ defmodule Loomkin.LSP.Client do
     {:noreply, state}
   end
 
-  def handle_info({port, {:exit_status, code}}, %{port: port} = state) do
-    Logger.warning("[LSP:#{state.name}] Server exited with code #{code}")
-
+  def handle_info({port, {:exit_status, _code}}, %{port: port} = state) do
     # Reply to any pending requests with error
     Enum.each(state.pending_requests, fn {_id, {_type, from}} ->
       if from, do: GenServer.reply(from, {:error, :server_exited})
@@ -287,8 +282,7 @@ defmodule Loomkin.LSP.Client do
       {:incomplete, _} ->
         state
 
-      {:error, reason} ->
-        Logger.warning("[LSP:#{state.name}] Failed to decode message: #{inspect(reason)}")
+      {:error, _reason} ->
         state
     end
   end
@@ -299,7 +293,6 @@ defmodule Loomkin.LSP.Client do
         # Send initialized notification
         send_notification(state.port, "initialized", %{})
         if from, do: GenServer.reply(from, {:ok, msg["result"]})
-        Logger.info("[LSP:#{state.name}] Initialized successfully")
 
         %{state | pending_requests: pending, initialized: true, status: :ready}
 
@@ -311,7 +304,6 @@ defmodule Loomkin.LSP.Client do
         %{state | pending_requests: pending, status: :stopped}
 
       {nil, _} ->
-        Logger.debug("[LSP:#{state.name}] Response for unknown request #{id}")
         state
     end
   end
@@ -352,16 +344,11 @@ defmodule Loomkin.LSP.Client do
         %{state | pending_requests: pending}
 
       {nil, _} ->
-        Logger.warning(
-          "[LSP:#{state.name}] Error response for unknown request: #{inspect(error)}"
-        )
-
         state
     end
   end
 
-  defp handle_lsp_message(%{"method" => method}, state) do
-    Logger.debug("[LSP:#{state.name}] Unhandled notification: #{method}")
+  defp handle_lsp_message(%{"method" => _method}, state) do
     state
   end
 

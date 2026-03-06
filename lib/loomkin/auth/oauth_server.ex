@@ -21,7 +21,6 @@ defmodule Loomkin.Auth.OAuthServer do
   """
 
   use GenServer
-  require Logger
 
   alias Loomkin.Auth.Provider
   alias Loomkin.Auth.ProviderRegistry
@@ -126,15 +125,10 @@ defmodule Loomkin.Auth.OAuthServer do
           started_at: System.monotonic_time(:millisecond)
         }
 
-        Logger.info(
-          "Started #{flow_type} OAuth flow for #{provider} (state: #{String.slice(state_token, 0..7)}...)"
-        )
-
         new_state = put_in(state.flows[state_token], flow)
         {:reply, {:ok, authorize_url, flow_type}, new_state}
 
       {:error, reason} ->
-        Logger.error("Failed to build authorize URL for #{provider}: #{inspect(reason)}")
         {:reply, {:error, {:authorize_url_failed, reason}}, state}
     end
   end
@@ -143,10 +137,6 @@ defmodule Loomkin.Auth.OAuthServer do
   def handle_call({:handle_callback, state_token, code}, _from, state) do
     case Map.pop(state.flows, state_token) do
       {nil, _} ->
-        Logger.warning(
-          "OAuth callback with unknown/expired state: #{String.slice(state_token, 0..7)}..."
-        )
-
         {:reply, {:error, :invalid_state}, state}
 
       {flow, remaining_flows} ->
@@ -160,7 +150,6 @@ defmodule Loomkin.Auth.OAuthServer do
     # Find the active flow for this provider
     case find_flow_by_provider(state.flows, provider) do
       nil ->
-        Logger.warning("Paste-back received for #{provider} but no active flow found")
         {:reply, {:error, :no_active_flow}, state}
 
       {state_token, flow} ->
@@ -182,7 +171,6 @@ defmodule Loomkin.Auth.OAuthServer do
             {:reply, result, %{state | flows: remaining_flows}}
 
           {:error, reason} ->
-            Logger.warning("Paste-back parse failed for #{provider}: #{inspect(reason)}")
             {:reply, {:error, reason}, state}
         end
     end
@@ -204,11 +192,7 @@ defmodule Loomkin.Auth.OAuthServer do
       {nil, _} ->
         {:noreply, state}
 
-      {flow, remaining_flows} ->
-        Logger.info(
-          "OAuth flow expired for #{flow.provider} (state: #{String.slice(state_token, 0..7)}...)"
-        )
-
+      {_flow, remaining_flows} ->
         # Piggyback: clean up stale Google OAuth session entries
         cleanup_stale_sessions()
 
@@ -217,8 +201,7 @@ defmodule Loomkin.Auth.OAuthServer do
   end
 
   @impl true
-  def handle_info(msg, state) do
-    Logger.warning("OAuthServer received unexpected message: #{inspect(msg)}")
+  def handle_info(_msg, state) do
     {:noreply, state}
   end
 
@@ -243,16 +226,13 @@ defmodule Loomkin.Auth.OAuthServer do
       {:ok, token_data} ->
         case TokenStore.store_tokens(flow.provider, token_data) do
           :ok ->
-            Logger.info("OAuth flow completed for #{flow.provider}")
             :ok
 
-          {:error, reason} ->
-            Logger.error("Failed to store tokens for #{flow.provider}: #{inspect(reason)}")
+          {:error, _reason} ->
             {:error, :token_store_failed}
         end
 
       {:error, reason} ->
-        Logger.error("OAuth code exchange failed for #{flow.provider}: #{inspect(reason)}")
         {:error, reason}
     end
   end

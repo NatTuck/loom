@@ -8,8 +8,6 @@ defmodule Loomkin.Channels.Supervisor do
 
   use Supervisor
 
-  require Logger
-
   def start_link(opts \\ []) do
     Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -34,7 +32,6 @@ defmodule Loomkin.Channels.Supervisor do
 
       case to_string(config[:mode] || "webhook") do
         "polling" ->
-          Logger.info("[Channels.Supervisor] Telegram polling mode — starting Poller")
           [Loomkin.Channels.Telegram.Poller]
 
         _webhook ->
@@ -69,12 +66,10 @@ defmodule Loomkin.Channels.Supervisor do
       # Use a default team_id placeholder — binding activates when a team starts
       case Loomkin.Channels.Bindings.find_or_create(:telegram, chat_id_str, "default") do
         {:ok, _binding} ->
-          Logger.info("[Channels.Supervisor] Auto-bound Telegram chat #{chat_id_str}")
+          :ok
 
-        {:error, reason} ->
-          Logger.warning(
-            "[Channels.Supervisor] Failed to auto-bind Telegram chat #{chat_id_str}: #{inspect(reason)}"
-          )
+        {:error, _reason} ->
+          :ok
       end
     end
   end

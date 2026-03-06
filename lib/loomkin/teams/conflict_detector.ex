@@ -13,8 +13,6 @@ defmodule Loomkin.Teams.ConflictDetector do
 
   use GenServer
 
-  require Logger
-
   alias Loomkin.Decisions.Graph
   alias Loomkin.Teams.Comms
 
@@ -118,7 +116,6 @@ defmodule Loomkin.Teams.ConflictDetector do
       seen_conflicts: MapSet.new()
     }
 
-    Logger.info("[ConflictDetector] Started for team #{team_id}")
     {:ok, state}
   end
 
@@ -341,8 +338,7 @@ defmodule Loomkin.Teams.ConflictDetector do
         state
     end
   rescue
-    e ->
-      Logger.warning("[ConflictDetector] Decision conflict check failed: #{Exception.message(e)}")
+    _ ->
       state
   end
 
@@ -388,8 +384,6 @@ defmodule Loomkin.Teams.ConflictDetector do
          team_id,
          %{agent_a: agent_a, agent_b: agent_b, type: type, description: desc} = details
        ) do
-    Logger.warning("[ConflictDetector] #{type} in team #{team_id}: #{desc}")
-
     Comms.broadcast(team_id, {:conflict_detected, details})
 
     # Inject warnings to both agents

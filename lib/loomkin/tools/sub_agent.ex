@@ -13,8 +13,6 @@ defmodule Loomkin.Tools.SubAgent do
 
   import Loomkin.Tool, only: [param!: 2, param: 3]
 
-  require Logger
-
   @max_iterations 10
 
   @read_only_tools [

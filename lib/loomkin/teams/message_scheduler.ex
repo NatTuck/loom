@@ -8,8 +8,6 @@ defmodule Loomkin.Teams.MessageScheduler do
 
   use GenServer
 
-  require Logger
-
   alias Loomkin.Teams.Agent
   alias Loomkin.Teams.Manager
 
@@ -88,7 +86,6 @@ defmodule Loomkin.Teams.MessageScheduler do
       scheduled: %{}
     }
 
-    Logger.info("[MessageScheduler] Started for team #{team_id}")
     {:ok, state}
   end
 
@@ -267,39 +264,23 @@ defmodule Loomkin.Teams.MessageScheduler do
         end
         |> case do
           {:error, :busy} when msg.retry_count < @max_retries ->
-            Logger.info(
-              "[MessageScheduler] Agent #{msg.target_agent} busy, retry #{msg.retry_count + 1}/#{@max_retries}"
-            )
-
             timer_ref = Process.send_after(self(), {:retry_deliver, msg.id}, @retry_delay_ms)
             updated = %{msg | timer_ref: timer_ref, retry_count: msg.retry_count + 1}
             put_in(state.scheduled[msg.id], updated)
 
           {:error, :busy} ->
-            Logger.warning(
-              "[MessageScheduler] Agent #{msg.target_agent} busy after #{@max_retries} retries, marking #{msg.id} as failed"
-            )
-
             updated = %{msg | status: :failed, timer_ref: nil}
             state = put_in(state.scheduled[msg.id], updated)
             broadcast_update(state)
             state
 
-          {:error, reason} ->
-            Logger.warning(
-              "[MessageScheduler] Delivery of #{msg.id} to #{msg.target_agent} failed: #{inspect(reason)}"
-            )
-
+          {:error, _reason} ->
             updated = %{msg | status: :failed, timer_ref: nil}
             state = put_in(state.scheduled[msg.id], updated)
             broadcast_update(state)
             state
 
           _ok ->
-            Logger.info(
-              "[MessageScheduler] Delivered scheduled message #{msg.id} to #{msg.target_agent}"
-            )
-
             updated = %{msg | status: :delivered, timer_ref: nil}
             state = put_in(state.scheduled[msg.id], updated)
 
@@ -314,10 +295,6 @@ defmodule Loomkin.Teams.MessageScheduler do
         end
 
       :error ->
-        Logger.warning(
-          "[MessageScheduler] Agent #{msg.target_agent} not found, marking #{msg.id} as failed"
-        )
-
         updated = %{msg | status: :failed, timer_ref: nil}
         state = put_in(state.scheduled[msg.id], updated)
         broadcast_update(state)

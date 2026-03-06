@@ -477,6 +477,15 @@ defmodule Loomkin.Teams.Role do
       - Log key decisions with confidence scores (node_type: "decision")
       - Check decision_query (type: "active_goals") before delegating to see existing context
       - When an approach fails, use pivot_decision to record the learning and new direction
+
+      ## Available Kin Specialists
+
+      The following pre-configured specialists are available to spawn. The user has defined
+      these for this project. Consider spawning them when their spawn context matches the
+      current situation. You can also create custom specialists with team_spawn if none of
+      these fit.
+
+      {kin_roster}
       """
     },
     orienter: %{
@@ -529,12 +538,22 @@ defmodule Loomkin.Teams.Role do
     }
   }
 
-  @doc "Get role configuration by name."
-  @spec get(atom()) :: {:ok, t()} | {:error, :unknown_role}
-  def get(name) when is_atom(name) do
+  @doc "Get role configuration by name. Accepts optional keyword opts (e.g. kin_agents for concierge)."
+  @spec get(atom(), keyword()) :: {:ok, t()} | {:error, :unknown_role}
+  def get(name, opts \\ []) when is_atom(name) do
     case Map.fetch(@built_in_role_data, name) do
       {:ok, data} ->
         data = Map.update!(data, :system_prompt, &append_context_awareness(name, &1))
+
+        data =
+          if name == :concierge do
+            kin_agents = Keyword.get(opts, :kin_agents, [])
+            kin_section = format_kin_roster(kin_agents)
+            Map.update!(data, :system_prompt, &String.replace(&1, "{kin_roster}", kin_section))
+          else
+            Map.update!(data, :system_prompt, &String.replace(&1, "{kin_roster}", ""))
+          end
+
         {:ok, struct!(__MODULE__, Map.put(data, :name, name))}
 
       :error ->
@@ -597,6 +616,33 @@ defmodule Loomkin.Teams.Role do
       budget_limit: get_config_value(config, :budget_limit, base.budget_limit),
       reasoning_strategy: get_config_value(config, :reasoning_strategy, base.reasoning_strategy)
     }
+  end
+
+  # -- Kin roster formatting --
+
+  defp format_kin_roster([]) do
+    "No pre-configured specialists defined yet. You can create custom specialists with team_spawn."
+  end
+
+  defp format_kin_roster(kin_agents) do
+    kin_agents
+    |> Enum.map(fn kin ->
+      potency_label =
+        cond do
+          kin.potency >= 81 -> "RECOMMENDED"
+          kin.potency >= 51 -> "suggested"
+          kin.potency >= 21 -> "available"
+          true -> "on-demand"
+        end
+
+      context =
+        if kin.spawn_context && kin.spawn_context != "",
+          do: "\n  When: #{kin.spawn_context}",
+          else: ""
+
+      "- **#{kin.display_name || kin.name}** (#{kin.role}, #{potency_label})#{context}"
+    end)
+    |> Enum.join("\n")
   end
 
   # -- Helpers --

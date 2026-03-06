@@ -39,8 +39,6 @@ defmodule Loomkin.MCP.ConfigListener do
   @moduledoc false
   use GenServer
 
-  require Logger
-
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -62,13 +60,7 @@ defmodule Loomkin.MCP.ConfigListener do
 
   def handle_info(%Jido.Signal{type: "system.config.loaded"}, %{started: false} = state) do
     if Loomkin.MCP.ClientSupervisor.enabled?() do
-      case DynamicSupervisor.start_child(Loomkin.MCP.DynSupervisor, Loomkin.MCP.Client) do
-        {:ok, _pid} ->
-          Logger.info("[MCP] Started MCP client from config")
-
-        {:error, reason} ->
-          Logger.warning("[MCP] Failed to start MCP client: #{inspect(reason)}")
-      end
+      DynamicSupervisor.start_child(Loomkin.MCP.DynSupervisor, Loomkin.MCP.Client)
 
       {:noreply, %{state | started: true}}
     else

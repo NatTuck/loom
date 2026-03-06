@@ -24,6 +24,9 @@ defmodule LoomkinWeb.AgentCardComponent do
   attr :team_id, :string, required: true
   attr :queue_count, :integer, default: 0
   attr :scheduled_count, :integer, default: 0
+  attr :model, :string, default: nil
+  attr :budget_used, :integer, default: 0
+  attr :budget_limit, :integer, default: 0
 
   def agent_card(assigns) do
     ~H"""
@@ -99,6 +102,13 @@ defmodule LoomkinWeb.AgentCardComponent do
           style="background: var(--brand-muted);"
         >
           {format_role(@card.role)}
+        </span>
+        <span
+          :if={@model}
+          class="text-[9px] px-1 py-0.5 rounded font-mono text-muted opacity-60 truncate max-w-[80px]"
+          title={@model}
+        >
+          {format_model(@model)}
         </span>
 
         <div class="flex-1"></div>
@@ -266,6 +276,22 @@ defmodule LoomkinWeb.AgentCardComponent do
         </div>
       </div>
 
+      <%!-- Budget micro-bar --%>
+      <div
+        :if={@budget_limit > 0}
+        class="mt-2 flex items-center gap-2"
+      >
+        <div class="flex-1 h-1 rounded-full bg-surface-3 overflow-hidden">
+          <div
+            class={["h-full rounded-full", budget_color(@budget_used, @budget_limit)]}
+            style={"width: #{min(budget_pct(@budget_used, @budget_limit), 100)}%"}
+          />
+        </div>
+        <span class="text-[9px] font-mono text-muted">
+          {format_tokens(@budget_used)}
+        </span>
+      </div>
+
       <%!-- Footer: current task --%>
       <div
         :if={@card.current_task}
@@ -334,4 +360,46 @@ defmodule LoomkinWeb.AgentCardComponent do
   end
 
   defp render_card_markdown(_), do: ""
+
+  # --- Model helpers ---
+
+  defp format_model(nil), do: ""
+
+  defp format_model(model) when is_binary(model) do
+    model
+    |> String.split("/")
+    |> List.last()
+    |> String.split(":")
+    |> List.last()
+    |> String.slice(0, 15)
+  end
+
+  defp format_model(_), do: ""
+
+  # --- Budget helpers ---
+
+  defp budget_pct(_used, 0), do: 0
+  defp budget_pct(used, limit), do: round(used / limit * 100)
+
+  defp budget_color(used, limit) do
+    pct = budget_pct(used, limit)
+
+    cond do
+      pct >= 80 -> "bg-red-400"
+      pct >= 50 -> "bg-amber-400"
+      true -> "bg-emerald-400"
+    end
+  end
+
+  defp format_tokens(0), do: ""
+
+  defp format_tokens(tokens) when tokens >= 1_000_000 do
+    "#{Float.round(tokens / 1_000_000, 1)}M"
+  end
+
+  defp format_tokens(tokens) when tokens >= 1_000 do
+    "#{Float.round(tokens / 1_000, 1)}k"
+  end
+
+  defp format_tokens(tokens), do: "#{tokens}"
 end

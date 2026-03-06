@@ -6,8 +6,6 @@ defmodule Loomkin.Channels.Router do
   parses bot commands, and dispatches to Bridge processes.
   """
 
-  require Logger
-
   alias Loomkin.Channels.AuditLog
   alias Loomkin.Channels.Bindings
   alias Loomkin.Channels.Bridge
@@ -329,7 +327,6 @@ defmodule Loomkin.Channels.Router do
     if allowed == [] or to_string(channel_id) in Enum.map(allowed, &to_string/1) do
       :ok
     else
-      Logger.warning("[Router] Channel ID #{channel_id} not in #{channel} allowlist")
       {:error, :channel_not_allowed}
     end
   end
@@ -351,7 +348,6 @@ defmodule Loomkin.Channels.Router do
         :ok
 
       true ->
-        Logger.warning("[Router] User #{user_id} not in #{channel} allowlist")
         {:error, :user_not_allowed}
     end
   end

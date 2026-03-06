@@ -6,8 +6,6 @@ defmodule Loomkin.LLMRetry do
   Broadcasts retry status via the provided callback for UI visibility.
   """
 
-  require Logger
-
   @default_max_retries 3
   @base_backoff_ms 1_000
 
@@ -30,7 +28,6 @@ defmodule Loomkin.LLMRetry do
   end
 
   defp do_retry(_fun, _on_retry, max_retries, attempt) when attempt > max_retries do
-    Logger.error("LLMRetry: max retries (#{max_retries}) exhausted")
     {:error, :max_retries_exhausted}
   end
 
@@ -42,16 +39,10 @@ defmodule Loomkin.LLMRetry do
       {:error, reason} ->
         if transient?(reason) and attempt < max_retries do
           backoff_ms = Integer.pow(2, attempt) * @base_backoff_ms
-
-          Logger.warning(
-            "LLMRetry: transient error (attempt #{attempt + 1}/#{max_retries}), retrying in #{backoff_ms}ms: #{inspect(reason)}"
-          )
-
           on_retry.(attempt + 1, reason, backoff_ms)
           Process.sleep(backoff_ms)
           do_retry(fun, on_retry, max_retries, attempt + 1)
         else
-          Logger.error("LLMRetry: permanent error or retries exhausted: #{inspect(reason)}")
           {:error, reason}
         end
     end

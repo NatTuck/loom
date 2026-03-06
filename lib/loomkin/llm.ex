@@ -20,8 +20,6 @@ defmodule Loomkin.LLM do
   This keeps call sites completely unaware of the auth mechanism.
   """
 
-  require Logger
-
   alias Loomkin.Auth.ProviderRegistry
   alias Loomkin.Auth.TokenStore
 
@@ -136,7 +134,6 @@ defmodule Loomkin.LLM do
 
               with {:ok, model} <- ReqLLM.model(model_spec),
                    {:ok, provider_module} <- ReqLLM.provider(oauth_atom) do
-                Logger.debug("Routing #{model_spec} via OAuth provider #{oauth_provider}")
                 {:oauth, model, provider_module}
               else
                 _ -> :passthrough

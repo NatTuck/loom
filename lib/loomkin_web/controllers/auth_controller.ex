@@ -17,8 +17,6 @@ defmodule LoomkinWeb.AuthController do
   alias Loomkin.Auth.ProviderRegistry
   alias Loomkin.Auth.TokenStore
 
-  require Logger
-
   @doc """
   Initiate OAuth flow.
 
@@ -45,9 +43,7 @@ defmodule LoomkinWeb.AuthController do
           # Standard redirect flow
           redirect(conn, external: authorize_url)
 
-        {:error, reason} ->
-          Logger.error("Failed to start OAuth flow for #{provider}: #{inspect(reason)}")
-
+        {:error, _reason} ->
           conn
           |> put_status(:internal_server_error)
           |> json(%{error: "Failed to start OAuth flow. Please try again."})
@@ -77,9 +73,7 @@ defmodule LoomkinWeb.AuthController do
           |> put_flash(:error, "OAuth flow expired or invalid. Please try again.")
           |> redirect(to: "/")
 
-        {:error, reason} ->
-          Logger.error("OAuth callback error for #{provider}: #{inspect(reason)}")
-
+        {:error, _reason} ->
           conn
           |> put_flash(
             :error,
@@ -95,9 +89,8 @@ defmodule LoomkinWeb.AuthController do
     end
   end
 
-  def callback(conn, %{"provider" => _provider, "error" => error} = params) do
+  def callback(conn, %{"provider" => _provider, "error" => _error} = params) do
     description = params["error_description"] || "unknown error"
-    Logger.warning("OAuth provider denied: #{error} — #{description}")
 
     conn
     |> put_flash(:error, "Authorization denied: #{description}")
@@ -137,9 +130,7 @@ defmodule LoomkinWeb.AuthController do
           |> put_status(:bad_request)
           |> json(%{error: "State validation failed. The pasted code may be invalid or expired."})
 
-        {:error, reason} ->
-          Logger.error("Paste-back error for #{provider}: #{inspect(reason)}")
-
+        {:error, _reason} ->
           conn
           |> put_status(:unprocessable_entity)
           |> json(%{

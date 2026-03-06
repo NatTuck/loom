@@ -12,8 +12,6 @@ defmodule Loomkin.AgentLoop.Strategies do
 
   alias Loomkin.Telemetry, as: LoomkinTelemetry
 
-  require Logger
-
   @type strategy :: :cot | :cod | :tot | :adaptive
 
   @doc """
@@ -61,8 +59,6 @@ defmodule Loomkin.AgentLoop.Strategies do
         Process.sleep(min(ms, 5_000))
 
       {:budget_exceeded, scope} ->
-        error_msg = "Budget exceeded (#{scope}). Stopping agent loop."
-        Logger.warning(error_msg)
         throw({:budget_exceeded, scope})
     end
 
@@ -99,7 +95,6 @@ defmodule Loomkin.AgentLoop.Strategies do
         {:ok, response_text, updated_messages, %{usage: usage}}
 
       {:error, reason} ->
-        Logger.error("Strategy #{effective_strategy} LLM error: #{inspect(reason)}")
         config.on_event.(:strategy_error, %{strategy: effective_strategy, error: inspect(reason)})
         {:error, reason, messages}
     end
