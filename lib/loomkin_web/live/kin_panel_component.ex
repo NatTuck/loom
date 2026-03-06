@@ -11,7 +11,7 @@ defmodule LoomkinWeb.KinPanelComponent do
   alias Loomkin.Kin
   alias Loomkin.Schemas.KinAgent
 
-  @user_roles [:lead, :researcher, :coder, :reviewer, :tester]
+  @user_roles [:researcher, :coder, :reviewer, :tester]
 
   @presets [
     %{
@@ -97,14 +97,14 @@ defmodule LoomkinWeb.KinPanelComponent do
             <h2 class="text-sm font-semibold" style="color: var(--text-primary);">
               {if @panel_mode == :list,
                 do: "Kin Management",
-                else: if(@editing_id, do: "Edit Kin", else: "New Kin")}
+                else: if(@editing_id, do: "Edit Template", else: "New Template")}
             </h2>
             <p
               :if={@panel_mode == :list}
               class="text-[10px] mt-0.5"
               style="color: var(--text-muted);"
             >
-              Define agents the concierge can spawn
+              Templates any kin can spawn as needed
             </p>
           </div>
           <button
@@ -117,7 +117,7 @@ defmodule LoomkinWeb.KinPanelComponent do
             <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
             </svg>
-            New
+            Template
           </button>
           <button
             phx-click="close_kin_panel"
@@ -148,23 +148,106 @@ defmodule LoomkinWeb.KinPanelComponent do
 
   defp render_list(assigns) do
     ~H"""
-    <div class="p-4 space-y-2">
+    <div class="p-4 space-y-4">
+      <%!-- Core Kin (always present) --%>
+      <div>
+        <p
+          class="text-[10px] uppercase tracking-wider mb-2 font-medium"
+          style="color: var(--text-muted);"
+        >
+          Core — always active
+        </p>
+        <div class="space-y-2">
+          <div
+            class="flex items-center gap-3 p-3 rounded-lg border"
+            style="border-color: var(--border-subtle); background: var(--surface-1);"
+          >
+            <div class="flex items-center justify-center w-7 h-7 rounded-full bg-violet-500/15 text-violet-400 text-xs font-bold flex-shrink-0">
+              C
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium" style="color: var(--text-primary);">Concierge</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-medium bg-violet-500/15 text-violet-400">
+                  core
+                </span>
+              </div>
+              <p class="text-[10px] mt-0.5" style="color: var(--text-muted);">
+                Your primary contact. Coordinates the team and spawns specialists as needed.
+              </p>
+            </div>
+            <span
+              :if={agent_active?("concierge", @active_agents)}
+              class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"
+              title="Active"
+            />
+          </div>
+          <div
+            class="flex items-center gap-3 p-3 rounded-lg border"
+            style="border-color: var(--border-subtle); background: var(--surface-1);"
+          >
+            <div class="flex items-center justify-center w-7 h-7 rounded-full bg-sky-500/15 text-sky-400 text-xs font-bold flex-shrink-0">
+              O
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium" style="color: var(--text-primary);">Orienter</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-medium bg-sky-500/15 text-sky-400">
+                  core
+                </span>
+              </div>
+              <p class="text-[10px] mt-0.5" style="color: var(--text-muted);">
+                Silently scans the project on session start and briefs the Concierge.
+              </p>
+            </div>
+            <span
+              :if={agent_active?("orienter", @active_agents)}
+              class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"
+              title="Active"
+            />
+          </div>
+        </div>
+      </div>
+
+      <%!-- How it works callout --%>
+      <div
+        class="rounded-lg px-3 py-2.5 text-[11px] leading-relaxed"
+        style="background: var(--surface-1); color: var(--text-muted); border: 1px solid var(--border-subtle);"
+      >
+        Kin spawn kin. The Concierge will create specialists automatically based on your
+        tasks — or any kin can spawn others when it needs help. Templates below give them a
+        head start.
+      </div>
+
+      <%!-- Separator --%>
+      <div class="flex items-center gap-2">
+        <div class="flex-1 h-px" style="background: var(--border-subtle);"></div>
+        <span
+          class="text-[10px] uppercase tracking-wider font-medium"
+          style="color: var(--text-muted);"
+        >
+          Templates
+        </span>
+        <div class="flex-1 h-px" style="background: var(--border-subtle);"></div>
+      </div>
+
+      <%!-- Empty state for templates --%>
       <div
         :if={@kin_agents == []}
-        class="rounded-lg border border-dashed py-10 text-center"
+        class="rounded-lg border border-dashed py-8 text-center"
         style="border-color: var(--border-subtle); background: var(--surface-1);"
       >
         <svg
-          class="w-8 h-8 mx-auto mb-2 opacity-30"
+          class="w-7 h-7 mx-auto mb-2 opacity-30"
           style="color: var(--text-muted);"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
           <path d="M7 8a3 3 0 100-6 3 3 0 000 6zM14.5 9a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM1.615 16.428a1.224 1.224 0 01-.569-1.175 6.002 6.002 0 0111.908 0c.058.467-.172.92-.57 1.174A9.953 9.953 0 017 18a9.953 9.953 0 01-5.385-1.572zM14.5 16h-.106c.07-.297.088-.611.048-.933a7.47 7.47 0 00-1.588-3.755 4.502 4.502 0 015.874 2.636.818.818 0 01-.36.98A7.465 7.465 0 0114.5 16z" />
         </svg>
-        <p class="text-xs" style="color: var(--text-muted);">No kin defined yet</p>
-        <p class="text-[10px] mt-1" style="color: var(--text-muted);">
-          Create your first agent template
+        <p class="text-xs font-medium" style="color: var(--text-secondary);">No templates yet</p>
+        <p class="text-[10px] mt-1 px-6" style="color: var(--text-muted);">
+          Optional — kin will improvise without them, but templates let you predefine roles, models, and spawn rules.
         </p>
       </div>
 
@@ -469,7 +552,7 @@ defmodule LoomkinWeb.KinPanelComponent do
             style="background: var(--surface-2); border: 1px solid var(--border-subtle); color: var(--text-primary);"
           >{@form[:spawn_context].value}</textarea>
           <p class="text-[10px] mt-1" style="color: var(--text-muted);">
-            Injected into the concierge's prompt as context for when to spawn this agent
+            Tells kin when to spawn this specialist
           </p>
         </div>
 
@@ -515,17 +598,16 @@ defmodule LoomkinWeb.KinPanelComponent do
           </summary>
           <div class="space-y-4 pt-2">
             <%!-- Model Override --%>
-            <div>
+            <div class="opacity-50">
               <label class="text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">
                 Model Override
               </label>
               <input
                 type="text"
-                name={@form[:model_override].name}
-                value={@form[:model_override].value}
-                placeholder="e.g. anthropic:claude-sonnet-4-6 (blank = session default)"
-                class="mt-1 w-full rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-                style="background: var(--surface-2); border: 1px solid var(--border-subtle); color: var(--text-primary);"
+                disabled
+                placeholder="Coming soon"
+                class="mt-1 w-full rounded-lg px-3 py-2 text-sm font-mono cursor-not-allowed"
+                style="background: var(--surface-2); border: 1px solid var(--border-subtle); color: var(--text-muted);"
               />
             </div>
 

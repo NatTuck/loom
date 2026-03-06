@@ -2671,20 +2671,37 @@ defmodule LoomkinWeb.WorkspaceLive do
             <div class="flex-1 h-px" style="background: var(--border-subtle);"></div>
           </div>
 
+          <%!-- Waiting state: session exists but agents haven't spawned yet --%>
           <div
-            :if={@concierge_card == nil && @worker_cards == []}
-            class="rounded-lg border border-dashed py-4 text-center cursor-pointer hover:bg-surface-1 transition-colors"
-            style="border-color: var(--border-subtle);"
-            phx-click="open_kin_panel"
+            :if={@concierge_card == nil && @worker_cards == [] && @active_team_id}
+            class="rounded-lg py-4 px-4 text-center"
+            style="background: var(--surface-1); border: 1px solid var(--border-subtle);"
           >
-            <svg
-              class="w-5 h-5 mx-auto mb-1.5 text-muted opacity-40"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-            </svg>
-            <div class="text-muted text-xs">Define your kin to get started</div>
+            <div class="flex justify-center gap-3 mb-2">
+              <div class="w-8 h-8 rounded-full bg-violet-500/15 flex items-center justify-center text-violet-400 text-xs font-bold">
+                C
+              </div>
+              <div class="w-8 h-8 rounded-full bg-sky-500/15 flex items-center justify-center text-sky-400 text-xs font-bold">
+                O
+              </div>
+            </div>
+            <div class="text-xs font-medium" style="color: var(--text-secondary);">
+              Concierge & Orienter ready
+            </div>
+            <div class="text-[10px] mt-0.5" style="color: var(--text-muted);">
+              Send a message to wake them up
+            </div>
+          </div>
+          <%!-- No session state --%>
+          <div
+            :if={@concierge_card == nil && @worker_cards == [] && !@active_team_id}
+            class="rounded-lg border border-dashed py-4 px-4 text-center"
+            style="border-color: var(--border-subtle);"
+          >
+            <div class="text-muted text-xs">Start a session to meet your kin</div>
+            <div class="text-[10px] mt-0.5" style="color: var(--text-muted);">
+              Concierge + Orienter spawn automatically
+            </div>
           </div>
 
           <%!-- Ghost cards for dormant kin (not yet spawned) --%>
@@ -4457,11 +4474,7 @@ defmodule LoomkinWeb.WorkspaceLive do
   end
 
   defp load_kin_agents do
-    try do
-      Loomkin.Kin.list_all()
-    rescue
-      _ -> []
-    end
+    Loomkin.Kin.list_all()
   end
 
   defp forward_to_team_components(socket) do
