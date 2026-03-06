@@ -72,7 +72,7 @@ defmodule Loomkin.Teams.AgentCheckpointTest do
 
   describe "paused status handling" do
     test "loop_paused result sets status to :paused and stores paused_state" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
 
       # Subscribe to agent status signals
       Loomkin.Signals.subscribe("agent.**")
@@ -202,7 +202,7 @@ defmodule Loomkin.Teams.AgentCheckpointTest do
 
   describe "priority routing while paused" do
     test "messages are queued normally when loop is active" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
       _task = simulate_active_loop(pid)
 
       # Send a normal-priority message directly

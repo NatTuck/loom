@@ -7,7 +7,7 @@ defmodule Loomkin.Channels.BridgeTest do
 
   setup :verify_on_exit!
 
-  defp signal(type, data \\ %{}) do
+  defp signal(type, data) do
     %Jido.Signal{
       id: Ecto.UUID.generate(),
       type: type,
@@ -77,7 +77,7 @@ defmodule Loomkin.Channels.BridgeTest do
       assert count >= 1
     end
 
-    test "subscribes to telemetry topic", %{team_id: team_id, pid: pid} do
+    test "subscribes to telemetry topic", %{pid: pid} do
       expect(Loomkin.MockAdapter, :send_text, fn _binding, text, _opts ->
         assert text =~ "Budget warning"
         :ok

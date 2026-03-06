@@ -6,7 +6,7 @@ defmodule Loomkin.Teams.OrchestrationTest do
 
   use Loomkin.DataCase, async: false
 
-  alias Loomkin.Teams.{Agent, Comms, Tasks}
+  alias Loomkin.Teams.{Agent, Tasks}
   alias Loomkin.Teams.Manager, as: TeamManager
   alias Loomkin.Session.Manager, as: SessionManager
 
@@ -142,7 +142,7 @@ defmodule Loomkin.Teams.OrchestrationTest do
   end
 
   describe "session integration" do
-    test "session tracks backing team", %{session_id: session_id, session_pid: session_pid} do
+    test "session tracks backing team", %{session_pid: session_pid} do
       {:ok, team_id} =
         TeamManager.create_team(name: "session-team", project_path: @project_path)
 
@@ -158,7 +158,6 @@ defmodule Loomkin.Teams.OrchestrationTest do
     end
 
     test "session tracks child teams and receives completion results", %{
-      session_id: session_id,
       session_pid: session_pid
     } do
       {:ok, backing_id} =

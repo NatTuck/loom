@@ -86,7 +86,7 @@ defmodule Loomkin.Teams.AgentTest do
 
   describe "message handling" do
     test "agent handles context_update" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
 
       # Send a message on the team topic — agent should handle it
       send(
@@ -102,7 +102,7 @@ defmodule Loomkin.Teams.AgentTest do
     end
 
     test "agent handles peer_message" do
-      %{pid: pid, team_id: team_id, name: name} = start_agent()
+      %{pid: pid} = start_agent()
 
       send(pid, {:peer_message, "lead", "do the thing"})
 
@@ -172,7 +172,7 @@ defmodule Loomkin.Teams.AgentTest do
 
   describe "context_update handling" do
     test "stores context from peers" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
 
       send(
         pid,
@@ -186,7 +186,7 @@ defmodule Loomkin.Teams.AgentTest do
     end
 
     test "updates replace previous context from same peer" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
 
       send(
         pid,
@@ -251,7 +251,7 @@ defmodule Loomkin.Teams.AgentTest do
 
   describe "discovery_relevant handler" do
     test "injects system message with observation and goal" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
 
       send(
         pid,
@@ -277,7 +277,7 @@ defmodule Loomkin.Teams.AgentTest do
     end
 
     test "includes keeper reference when keeper_id is present" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
 
       send(
         pid,
@@ -300,7 +300,7 @@ defmodule Loomkin.Teams.AgentTest do
 
   describe "confidence_warning handler" do
     test "injects system message with confidence warning" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
 
       send(
         pid,
@@ -326,7 +326,7 @@ defmodule Loomkin.Teams.AgentTest do
     end
 
     test "includes keeper reference when keeper_id is present" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
 
       send(
         pid,
@@ -347,7 +347,7 @@ defmodule Loomkin.Teams.AgentTest do
     end
 
     test "multiple nervous system messages accumulate" do
-      %{pid: pid, team_id: team_id} = start_agent()
+      %{pid: pid} = start_agent()
 
       send(
         pid,

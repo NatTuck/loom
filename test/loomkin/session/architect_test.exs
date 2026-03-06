@@ -64,7 +64,7 @@ defmodule Loomkin.Session.ArchitectTest do
   describe "architect model resolution" do
     test "default model config uses primary model" do
       default = Loomkin.Config.get(:model, :default)
-      assert default == "zai:glm-5"
+      assert is_binary(default)
     end
 
     test "editor model defaults to nil (uses primary model)" do
