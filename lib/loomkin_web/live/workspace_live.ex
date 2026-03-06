@@ -1496,14 +1496,38 @@ defmodule LoomkinWeb.WorkspaceLive do
         socket.assigns.child_teams ++ [child_team_id]
       end
 
+    existing_card_names = Map.keys(socket.assigns.agent_cards)
+
     socket =
       socket
       |> subscribe_to_team(child_team_id)
       |> assign(:child_teams, child_teams)
       |> update(:roster_version, &((&1 || 0) + 1))
       |> refresh_roster()
+      |> sync_cards_with_roster()
 
-    {:noreply, socket}
+    # Generate "joined" comms events for newly-discovered agents
+    new_agents =
+      socket.assigns.cached_agents
+      |> Enum.map(& &1.name)
+      |> Enum.reject(&(&1 in existing_card_names))
+
+    comms_events =
+      Enum.reduce(new_agents, socket.assigns.comms_events, fn agent_name, comms ->
+        event = %{
+          id: Ecto.UUID.generate(),
+          type: :agent_spawn,
+          agent: agent_name,
+          content: "#{agent_name} joined",
+          timestamp: DateTime.utc_now(),
+          expanded: false,
+          metadata: %{}
+        }
+
+        comms ++ [event]
+      end)
+
+    {:noreply, assign(socket, comms_events: comms_events)}
   end
 
   def handle_info({:team_dissolved, team_id}, socket) do
@@ -3512,9 +3536,9 @@ defmodule LoomkinWeb.WorkspaceLive do
   defp update_agent_card(socket, _, _), do: socket
 
   defp update_card_status(socket, agent_name, status) do
-    # Clear stale :last_thinking content when agent goes idle
+    # Clear stale :last_thinking content when agent goes idle or complete
     extra =
-      if status == :idle do
+      if status in [:idle, :complete] do
         card = get_in(socket.assigns, [:agent_cards, agent_name])
 
         if card && card.content_type == :last_thinking do

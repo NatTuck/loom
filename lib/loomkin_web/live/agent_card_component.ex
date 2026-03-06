@@ -210,7 +210,13 @@ defmodule LoomkinWeb.AgentCardComponent do
               {render_card_markdown(format_content(@card.latest_content, @focused))}
             </div>
           <% _ -> %>
-            <p class="text-xs text-muted italic">idle</p>
+            <%= if @card.status == :complete do %>
+              <p class="text-xs italic" style="color: var(--color-emerald-400);">
+                Orientation complete
+              </p>
+            <% else %>
+              <p class="text-xs text-muted italic">idle</p>
+            <% end %>
         <% end %>
 
         <%!-- Last tool (always visible as subtle footer) --%>
@@ -250,6 +256,7 @@ defmodule LoomkinWeb.AgentCardComponent do
   defp status_dot_class(:paused), do: "bg-blue-400 animate-pulse"
   defp status_dot_class(:error), do: "bg-red-400 agent-dot-error"
   defp status_dot_class(:waiting_permission), do: "bg-amber-400 agent-dot-thinking"
+  defp status_dot_class(:complete), do: "bg-emerald-400"
   defp status_dot_class(_), do: "bg-zinc-500"
 
   # --- Tool lookup helpers ---

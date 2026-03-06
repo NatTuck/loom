@@ -448,8 +448,16 @@ defmodule Loomkin.Teams.Agent do
 
         state = %{state | messages: msgs, failure_count: 0, loop_task: nil}
         state = track_usage(state, meta)
-        state = set_status(state, :idle)
-        broadcast_team(state, {:agent_status, state.name, :idle})
+
+        # Orienter is one-shot: mark complete instead of idle after auto-orient
+        {final_status, state} =
+          if state.role == :orienter and is_nil(from) do
+            {:complete, set_status(state, :complete)}
+          else
+            {:idle, set_status(state, :idle)}
+          end
+
+        broadcast_team(state, {:agent_status, state.name, final_status})
 
         if from do
           GenServer.reply(from, {:ok, text})
@@ -476,8 +484,16 @@ defmodule Loomkin.Teams.Agent do
 
         state = %{state | messages: msgs, failure_count: 0, model: new_model, loop_task: nil}
         state = track_usage(state, meta)
-        state = set_status(state, :idle)
-        broadcast_team(state, {:agent_status, state.name, :idle})
+
+        # Orienter is one-shot: mark complete instead of idle after auto-orient
+        {final_status, state} =
+          if state.role == :orienter and is_nil(from) do
+            {:complete, set_status(state, :complete)}
+          else
+            {:idle, set_status(state, :idle)}
+          end
+
+        broadcast_team(state, {:agent_status, state.name, final_status})
 
         if from do
           GenServer.reply(from, {:ok, text})
