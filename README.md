@@ -14,7 +14,7 @@
 
 Spawn specialists in milliseconds. Share discoveries in real-time. Review each other's work. Debate approaches and vote on decisions. Remember everything across sessions -- not just what happened, but *why*.
 
-Watch it all unfold from a live mission control UI. Built on Erlang/OTP -- the same runtime that powers WhatsApp and Discord.
+Watch it all unfold from a live mission control UI. Built on Erlang/OTP.
 
 - **Decision graph** — persistent reasoning memory that survives across sessions (not just chat history)
 - **Context mesh** — overflow is offloaded to Keeper processes, never summarized away. 228K+ tokens preserved vs 128K with zero loss
