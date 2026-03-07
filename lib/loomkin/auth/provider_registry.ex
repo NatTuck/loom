@@ -14,7 +14,7 @@ defmodule Loomkin.Auth.ProviderRegistry do
   4. Everything else propagates automatically.
   """
 
-  @type flow_type :: :redirect | :paste_back
+  @type flow_type :: :redirect | :paste_back | :api_key
 
   @type provider_entry :: %{
           id: atom(),
@@ -59,6 +59,16 @@ defmodule Loomkin.Auth.ProviderRegistry do
       base_prefix: "openai",
       env_var: "OPENAI_API_KEY",
       flow_type: :redirect
+    },
+    %{
+      id: :bailian,
+      display_name: "Model Studio Coding Plan",
+      auth_module: nil,
+      reqllm_module: Loomkin.Providers.BailianCodingPlan,
+      oauth_prefix: nil,
+      base_prefix: "bailian",
+      env_var: "BAILIAN_API_KEY",
+      flow_type: :api_key
     }
   ]
 
@@ -124,7 +134,9 @@ defmodule Loomkin.Auth.ProviderRegistry do
   """
   @spec oauth_provider_map() :: %{String.t() => String.t()}
   def oauth_provider_map do
-    Map.new(@providers, fn p -> {p.base_prefix, p.oauth_prefix} end)
+    @providers
+    |> Enum.filter(&(&1.oauth_prefix != nil))
+    |> Map.new(fn p -> {p.base_prefix, p.oauth_prefix} end)
   end
 
   # ── OAuth-capable set (replaces Models.@oauth_capable_providers) ────
@@ -132,7 +144,9 @@ defmodule Loomkin.Auth.ProviderRegistry do
   @doc "MapSet of provider atoms that support OAuth."
   @spec oauth_capable_providers() :: MapSet.t(atom())
   def oauth_capable_providers do
-    MapSet.new(@providers, & &1.id)
+    @providers
+    |> Enum.filter(&(&1.auth_module != nil))
+    |> MapSet.new(& &1.id)
   end
 
   # ── Flow type helpers ──────────────────────────────────────────────
@@ -153,7 +167,7 @@ defmodule Loomkin.Auth.ProviderRegistry do
   @spec oauth_prefix?(String.t()) :: boolean()
   def oauth_prefix?(model) when is_binary(model) do
     Enum.any?(@providers, fn p ->
-      String.starts_with?(model, p.oauth_prefix <> ":")
+      p.oauth_prefix != nil and String.starts_with?(model, p.oauth_prefix <> ":")
     end)
   end
 

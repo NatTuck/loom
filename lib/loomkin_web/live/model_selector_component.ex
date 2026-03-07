@@ -644,6 +644,10 @@ defmodule LoomkinWeb.ModelSelectorComponent do
       :redirect ->
         # For redirect flow: navigate to the auth controller which will redirect
         {:noreply, redirect(socket, external: "/auth/#{provider}")}
+
+      :api_key ->
+        # API key providers don't have OAuth flows
+        {:noreply, socket}
     end
   end
 

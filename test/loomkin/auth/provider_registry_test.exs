@@ -43,9 +43,9 @@ defmodule Loomkin.Auth.ProviderRegistryTest do
       end
     end
 
-    test "all flow types are :redirect or :paste_back" do
+    test "all flow types are :redirect, :paste_back, or :api_key" do
       for entry <- ProviderRegistry.all() do
-        assert entry.flow_type in [:redirect, :paste_back],
+        assert entry.flow_type in [:redirect, :paste_back, :api_key],
                "#{entry.id} has invalid flow_type: #{inspect(entry.flow_type)}"
       end
     end
@@ -155,15 +155,19 @@ defmodule Loomkin.Auth.ProviderRegistryTest do
   end
 
   describe "oauth_capable_providers/0" do
-    test "returns a MapSet containing all registered provider IDs" do
+    test "returns a MapSet containing only OAuth-capable provider IDs" do
       set = ProviderRegistry.oauth_capable_providers()
       assert %MapSet{} = set
 
-      for entry <- ProviderRegistry.all() do
+      # Only providers with auth_module should be in the set
+      for entry <- ProviderRegistry.all(), entry.auth_module != nil do
         assert MapSet.member?(set, entry.id)
       end
 
-      assert MapSet.size(set) == length(ProviderRegistry.all())
+      # Providers without OAuth (auth_module: nil) should not be in the set
+      for entry <- ProviderRegistry.all(), entry.auth_module == nil do
+        refute MapSet.member?(set, entry.id)
+      end
     end
   end
 
@@ -183,7 +187,7 @@ defmodule Loomkin.Auth.ProviderRegistryTest do
 
   describe "oauth_prefix?/1" do
     test "returns true for oauth-prefixed model string" do
-      for entry <- ProviderRegistry.all() do
+      for entry <- ProviderRegistry.all(), entry.oauth_prefix != nil do
         assert ProviderRegistry.oauth_prefix?("#{entry.oauth_prefix}:some-model")
       end
     end
@@ -251,14 +255,14 @@ defmodule Loomkin.Auth.ProviderRegistryTest do
 
   describe "registry consistency" do
     test "oauth_prefix always ends with _oauth" do
-      for entry <- ProviderRegistry.all() do
+      for entry <- ProviderRegistry.all(), entry.oauth_prefix != nil do
         assert String.ends_with?(entry.oauth_prefix, "_oauth"),
                "#{entry.id} oauth_prefix #{entry.oauth_prefix} doesn't end with _oauth"
       end
     end
 
     test "oauth_prefix starts with base_prefix" do
-      for entry <- ProviderRegistry.all() do
+      for entry <- ProviderRegistry.all(), entry.oauth_prefix != nil do
         assert String.starts_with?(entry.oauth_prefix, entry.base_prefix),
                "#{entry.id} oauth_prefix #{entry.oauth_prefix} doesn't start with base_prefix #{entry.base_prefix}"
       end
@@ -270,7 +274,11 @@ defmodule Loomkin.Auth.ProviderRegistryTest do
     end
 
     test "no duplicate oauth_prefixes" do
-      prefixes = Enum.map(ProviderRegistry.all(), & &1.oauth_prefix)
+      prefixes =
+        ProviderRegistry.all()
+        |> Enum.filter(&(&1.oauth_prefix != nil))
+        |> Enum.map(& &1.oauth_prefix)
+
       assert prefixes == Enum.uniq(prefixes)
     end
   end

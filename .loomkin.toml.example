@@ -1,9 +1,16 @@
 [model]
-default = "zai:glm-5"
-# weak = "zai:glm-4.5"                 # for summarization, commit messages
+default = "bailian:qwen3.5-plus"
+weak = "bailian:MiniMax-M2.5"
 
 [permissions]
 auto_approve = ["file_read", "file_search", "content_search", "directory_list"]
+
+# ── API Key authentication ────────────────────────────────────────────
+# Alibaba Model Studio Coding Plan — API key authentication.
+# Set BAILIAN_API_KEY environment variable or configure here.
+#
+# [auth.bailian]
+# api_key = "sk-sp-..."
 
 [context]
 max_repo_map_tokens = 2048

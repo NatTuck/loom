@@ -100,36 +100,42 @@ defmodule Loomkin.Auth.OAuthServer do
 
   @impl true
   def handle_call({:start_flow, provider, redirect_uri}, _from, state) do
-    provider_mod = Provider.module_for(provider)
+    # API-key-only providers don't have OAuth flows
     flow_type = ProviderRegistry.flow_type(provider)
 
-    code_verifier = Provider.generate_code_verifier()
-    state_token = Provider.generate_state()
+    if flow_type == :api_key do
+      {:reply, {:error, :no_oauth_flow}, state}
+    else
+      provider_mod = Provider.module_for(provider)
 
-    case provider_mod.build_authorize_url(%{
-           state: state_token,
-           code_verifier: code_verifier,
-           redirect_uri: redirect_uri
-         }) do
-      {:ok, authorize_url} ->
-        # Schedule expiry cleanup
-        timer_ref = Process.send_after(self(), {:flow_expired, state_token}, @flow_timeout_ms)
+      code_verifier = Provider.generate_code_verifier()
+      state_token = Provider.generate_state()
 
-        flow = %{
-          provider: provider,
-          code_verifier: code_verifier,
-          redirect_uri: redirect_uri,
-          state_token: state_token,
-          flow_type: flow_type,
-          timer_ref: timer_ref,
-          started_at: System.monotonic_time(:millisecond)
-        }
+      case provider_mod.build_authorize_url(%{
+             state: state_token,
+             code_verifier: code_verifier,
+             redirect_uri: redirect_uri
+           }) do
+        {:ok, authorize_url} ->
+          # Schedule expiry cleanup
+          timer_ref = Process.send_after(self(), {:flow_expired, state_token}, @flow_timeout_ms)
 
-        new_state = put_in(state.flows[state_token], flow)
-        {:reply, {:ok, authorize_url, flow_type}, new_state}
+          flow = %{
+            provider: provider,
+            code_verifier: code_verifier,
+            redirect_uri: redirect_uri,
+            state_token: state_token,
+            flow_type: flow_type,
+            timer_ref: timer_ref,
+            started_at: System.monotonic_time(:millisecond)
+          }
 
-      {:error, reason} ->
-        {:reply, {:error, {:authorize_url_failed, reason}}, state}
+          new_state = put_in(state.flows[state_token], flow)
+          {:reply, {:ok, authorize_url, flow_type}, new_state}
+
+        {:error, reason} ->
+          {:reply, {:error, {:authorize_url_failed, reason}}, state}
+      end
     end
   end
 
