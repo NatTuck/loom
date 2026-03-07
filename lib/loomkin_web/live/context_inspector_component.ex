@@ -39,11 +39,6 @@ defmodule LoomkinWeb.ContextInspectorComponent do
     {:noreply, assign(socket, active_tab: String.to_existing_atom(tab))}
   end
 
-  def handle_event("resume_follow", _params, socket) do
-    send(self(), {:resume_follow})
-    {:noreply, socket}
-  end
-
   def handle_event("toggle_collapse", _params, socket) do
     {:noreply, assign(socket, collapsed: !socket.assigns.collapsed)}
   end
@@ -107,11 +102,6 @@ defmodule LoomkinWeb.ContextInspectorComponent do
         {format_role(@focused_card.role)}
       </span>
       <div class="ml-auto flex items-center gap-1.5">
-        <.follow_indicator
-          inspector_mode={@inspector_mode}
-          focused_agent={@focused_agent}
-          myself={@myself}
-        />
         <button
           phx-click="toggle_collapse"
           phx-target={@myself}
@@ -207,39 +197,6 @@ defmodule LoomkinWeb.ContextInspectorComponent do
     </div>
     """
   end
-
-  # ── Follow indicator ────────────────────────────────────────────────
-
-  defp follow_indicator(%{focused_agent: nil} = assigns), do: ~H""
-
-  defp follow_indicator(%{inspector_mode: :auto_follow} = assigns) do
-    ~H"""
-    <div class="badge-success gap-1.5">
-      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
-      <span class="truncate max-w-[100px]">Following {@focused_agent}</span>
-    </div>
-    """
-  end
-
-  defp follow_indicator(%{inspector_mode: :pinned} = assigns) do
-    ~H"""
-    <div class="flex items-center gap-1.5">
-      <div class="badge gap-1.5">
-        <.icon name="hero-map-pin-mini" class="w-3 h-3 flex-shrink-0" />
-        <span class="truncate max-w-[100px]">Pinned to {@focused_agent}</span>
-      </div>
-      <button
-        phx-click="resume_follow"
-        phx-target={@myself}
-        class="press-down text-[10px] px-2 py-0.5 rounded-full font-medium bg-brand-subtle text-brand border border-brand"
-      >
-        Resume
-      </button>
-    </div>
-    """
-  end
-
-  defp follow_indicator(assigns), do: ~H""
 
   # ── Tab content ─────────────────────────────────────────────────────
 

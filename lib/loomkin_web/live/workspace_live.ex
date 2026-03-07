@@ -2525,15 +2525,6 @@ defmodule LoomkinWeb.WorkspaceLive do
               </svg>
               All agents
             </button>
-            <span
-              class="text-xs font-medium"
-              style={"color: #{LoomkinWeb.AgentColors.agent_color(@focused_card.name)}"}
-            >
-              {@focused_card.name}
-            </span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded font-medium text-muted bg-brand-muted">
-              {format_agent_role(@focused_card.role)}
-            </span>
           </div>
           <div class="flex-1 overflow-auto min-h-0">
             <.live_component

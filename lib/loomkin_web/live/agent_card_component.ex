@@ -182,6 +182,7 @@ defmodule LoomkinWeb.AgentCardComponent do
             </div>
             <div class="flex items-center gap-1.5 mt-0.5">
               <span
+                :if={!role_matches_name?(@card.role, @card.name)}
                 class="text-[9px] font-mono uppercase tracking-widest"
                 style={"color: #{@agent_color}60;"}
               >
@@ -435,6 +436,13 @@ defmodule LoomkinWeb.AgentCardComponent do
   defp tool_config(_), do: @default_tool_config
 
   # --- Formatting helpers ---
+
+  defp role_matches_name?(role, name)
+       when (is_atom(role) or is_binary(role)) and is_binary(name) do
+    String.downcase(to_string(role)) == String.downcase(String.replace(name, "_", ""))
+  end
+
+  defp role_matches_name?(_, _), do: false
 
   defp format_role(role) when is_atom(role) or is_binary(role) do
     role |> to_string() |> String.replace("_", " ") |> String.capitalize()
